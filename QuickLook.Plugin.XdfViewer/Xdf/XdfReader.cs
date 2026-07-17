@@ -55,7 +55,10 @@ namespace QuickLook.Plugin.XdfViewer.Xdf
                         case XdfChunkTag.StreamHeader:
                             ParseStreamHeader(reader, contentEnd, streams, order);
                             break;
-                        // Samples/StreamFooter/ClockOffset/Boundary: handled in later tasks or skipped.
+                        case XdfChunkTag.StreamFooter:
+                            ParseStreamFooter(reader, contentEnd, streams, order);
+                            break;
+                        // Samples/ClockOffset/Boundary: handled in later tasks or skipped.
                     }
 
                     stream.Seek(contentEnd, SeekOrigin.Begin); // always resync to chunk boundary
@@ -113,6 +116,25 @@ namespace QuickLook.Plugin.XdfViewer.Xdf
                         Type = (string)ch.Element("type")
                     });
             }
+        }
+
+        private static void ParseStreamFooter(BinaryReader reader, long contentEnd,
+            Dictionary<uint, XdfStream> streams, List<uint> order)
+        {
+            uint id = reader.ReadUInt32();
+            var info = SafeRootInfo(ReadXml(reader, contentEnd));
+            var s = GetOrAdd(streams, order, id);
+            if (info == null) return;
+
+            var first = info.Element("first_timestamp");
+            var last = info.Element("last_timestamp");
+            var count = info.Element("sample_count");
+            var srate = info.Element("measured_srate");
+
+            if (first != null) s.FirstTimestamp = ParseDouble(first, 0);
+            if (last != null) s.LastTimestamp = ParseDouble(last, 0);
+            if (count != null) s.SampleCount = (long)ParseDouble(count, 0);
+            if (srate != null) s.MeasuredSampleRate = ParseDouble(srate, 0);
         }
 
         private static XdfStream GetOrAdd(Dictionary<uint, XdfStream> streams, List<uint> order, uint id)
