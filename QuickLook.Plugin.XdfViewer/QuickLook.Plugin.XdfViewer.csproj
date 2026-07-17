@@ -27,4 +27,10 @@
     <None Remove="QuickLook.Common\**" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="QuickLook.Plugin.Metadata.Base.config">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
