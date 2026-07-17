@@ -41,5 +41,23 @@ namespace QuickLook.Plugin.XdfViewer.Tests
             f.Streams.Add(new XdfStream { FirstTimestamp = 2.0, LastTimestamp = 9.0 });
             Assert.Equal(8.0, f.TotalDuration.Value, 3);
         }
+
+        [Fact]
+        public void TotalDuration_Null_WhenNoStreamHasBothTimestamps()
+        {
+            var f = new XdfFile();
+            f.Streams.Add(new XdfStream { FirstTimestamp = 1.0, LastTimestamp = null });
+            f.Streams.Add(new XdfStream { FirstTimestamp = null, LastTimestamp = 100.0 });
+            Assert.Null(f.TotalDuration);
+        }
+
+        [Fact]
+        public void TotalDuration_IgnoresStreamsMissingATimestamp()
+        {
+            var f = new XdfFile();
+            f.Streams.Add(new XdfStream { FirstTimestamp = 1.0, LastTimestamp = 5.0 }); // paired
+            f.Streams.Add(new XdfStream { FirstTimestamp = 0.0, LastTimestamp = null }); // unpaired — ignored
+            Assert.Equal(4.0, f.TotalDuration.Value, 3);
+        }
     }
 }
