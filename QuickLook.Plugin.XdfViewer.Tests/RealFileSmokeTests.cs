@@ -29,7 +29,7 @@ namespace QuickLook.Plugin.XdfViewer.Tests
             var file = XdfReader.Read(path);
             Assert.NotNull(file);
             Assert.NotEmpty(file.Streams);
-            Assert.All(file.Streams, s => Assert.True(s.ChannelCount >= 0));
+            Assert.Contains(file.Streams, s => s.ChannelCount > 0);
         }
     }
 }

@@ -31,6 +31,7 @@ namespace QuickLook.Plugin.XdfViewer
         {
             var panel = new XdfPreviewPanel();
             _panel = panel;
+            panel.ApplyTheme(context.Theme);
             var fileName = Path.GetFileName(path);
             context.ViewerContent = panel;
             context.Title = fileName;

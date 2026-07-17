@@ -40,7 +40,7 @@ namespace QuickLook.Plugin.XdfViewer.Xdf
                     long len = reader.ReadVarLength();
                     long tagPos = stream.Position;
                     long contentEnd = tagPos + len;
-                    if (len < 2 || contentEnd > stream.Length)
+                    if (len < 2 || contentEnd < tagPos || contentEnd > stream.Length)
                     {
                         file.IsTruncated = true;
                         break;
@@ -67,7 +67,6 @@ namespace QuickLook.Plugin.XdfViewer.Xdf
                     stream.Seek(contentEnd, SeekOrigin.Begin); // always resync to chunk boundary
                 }
             }
-            catch (EndOfStreamException) { file.IsTruncated = true; }
             catch (Exception) { file.IsTruncated = true; }
 
             foreach (var id in order)

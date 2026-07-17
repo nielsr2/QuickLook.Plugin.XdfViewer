@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Media;
 using QuickLook.Plugin.XdfViewer.ViewModels;
 
 namespace QuickLook.Plugin.XdfViewer
@@ -31,6 +32,17 @@ namespace QuickLook.Plugin.XdfViewer
             Root.Visibility = Visibility.Collapsed;
             ErrorText.Text = "Couldn't read this XDF file.\n" + message;
             ErrorText.Visibility = Visibility.Visible;
+        }
+
+        public void ApplyTheme(QuickLook.Common.Plugin.Themes theme)
+        {
+            // Set an explicit foreground so text stays readable regardless of the host chrome.
+            // Cards/gray accents (#888) are theme-neutral and unaffected.
+            if (theme == QuickLook.Common.Plugin.Themes.Dark)
+                Foreground = new SolidColorBrush(Color.FromRgb(0xEC, 0xEC, 0xEC));
+            else if (theme == QuickLook.Common.Plugin.Themes.Light)
+                Foreground = new SolidColorBrush(Color.FromRgb(0x1A, 0x1A, 0x1A));
+            // Themes.None: leave the inherited default.
         }
     }
 
