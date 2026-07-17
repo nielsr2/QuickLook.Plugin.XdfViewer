@@ -155,7 +155,30 @@ namespace QuickLook.Plugin.XdfViewer.Xdf
             long numSamples = reader.ReadVarLength();
             var s = GetOrAdd(streams, order, id);
             s.TalliedSampleCount += numSamples;
-            // Value bytes are skipped by the caller's resync seek (Task 8 decodes marker streams).
+
+            if (!s.IsMarkerStream) return; // never decode numeric sample values
+
+            var stream = reader.BaseStream;
+            for (long i = 0; i < numSamples && stream.Position < contentEnd; i++)
+            {
+                byte tsMarker = reader.ReadByte();
+                double ts = double.NaN;
+                if (tsMarker == 8) ts = reader.ReadDouble();
+
+                string value = null;
+                int channelCount = s.ChannelCount > 0 ? s.ChannelCount : 1;
+                for (int c = 0; c < channelCount; c++)
+                {
+                    long slen = reader.ReadVarLength();
+                    var strBytes = reader.ReadBytes((int)slen);
+                    var str = Encoding.UTF8.GetString(strBytes);
+                    value = c == 0 ? str : value + " | " + str;
+                }
+
+                if (s.Markers.Count < MaxMarkersPerStream)
+                    s.Markers.Add(new XdfMarker { Timestamp = ts, Value = value });
+                else { s.MarkersTruncated = true; break; }
+            }
         }
 
         private static XdfStream GetOrAdd(Dictionary<uint, XdfStream> streams, List<uint> order, uint id)
