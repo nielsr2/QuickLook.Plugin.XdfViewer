@@ -58,7 +58,10 @@ namespace QuickLook.Plugin.XdfViewer.Xdf
                         case XdfChunkTag.StreamFooter:
                             ParseStreamFooter(reader, contentEnd, streams, order);
                             break;
-                        // Samples/ClockOffset/Boundary: handled in later tasks or skipped.
+                        case XdfChunkTag.Samples:
+                            ParseSamples(reader, contentEnd, streams, order);
+                            break;
+                        // ClockOffset/Boundary: handled in later tasks or skipped.
                     }
 
                     stream.Seek(contentEnd, SeekOrigin.Begin); // always resync to chunk boundary
@@ -68,7 +71,15 @@ namespace QuickLook.Plugin.XdfViewer.Xdf
             catch (Exception) { file.IsTruncated = true; }
 
             foreach (var id in order)
-                file.Streams.Add(streams[id]);
+            {
+                var s = streams[id];
+                if (!s.SampleCount.HasValue)
+                {
+                    if (s.TalliedSampleCount > 0) s.SampleCount = s.TalliedSampleCount;
+                    s.IsIncomplete = true; // no footer was seen
+                }
+                file.Streams.Add(s);
+            }
             return file;
         }
 
@@ -135,6 +146,16 @@ namespace QuickLook.Plugin.XdfViewer.Xdf
             if (last != null) s.LastTimestamp = ParseDouble(last, 0);
             if (count != null) s.SampleCount = (long)ParseDouble(count, 0);
             if (srate != null) s.MeasuredSampleRate = ParseDouble(srate, 0);
+        }
+
+        private static void ParseSamples(BinaryReader reader, long contentEnd,
+            Dictionary<uint, XdfStream> streams, List<uint> order)
+        {
+            uint id = reader.ReadUInt32();
+            long numSamples = reader.ReadVarLength();
+            var s = GetOrAdd(streams, order, id);
+            s.TalliedSampleCount += numSamples;
+            // Value bytes are skipped by the caller's resync seek (Task 8 decodes marker streams).
         }
 
         private static XdfStream GetOrAdd(Dictionary<uint, XdfStream> streams, List<uint> order, uint id)
