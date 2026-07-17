@@ -29,29 +29,29 @@ namespace QuickLook.Plugin.XdfViewer
 
         public void View(string path, ContextObject context)
         {
-            _panel = new XdfPreviewPanel();
-            context.ViewerContent = _panel;
-            context.Title = Path.GetFileName(path);
+            var panel = new XdfPreviewPanel();
+            _panel = panel;
+            var fileName = Path.GetFileName(path);
+            context.ViewerContent = panel;
+            context.Title = fileName;
 
             Task.Run(() =>
             {
                 try
                 {
                     var file = XdfReader.Read(path);
-                    var vm = file == null
-                        ? null
-                        : new XdfOverviewViewModel(file, Path.GetFileName(path));
-                    _panel.Dispatcher.Invoke(() =>
+                    var vm = file == null ? null : new XdfOverviewViewModel(file, fileName);
+                    panel.Dispatcher.Invoke(() =>
                     {
-                        _panel.ShowModel(vm);
+                        panel.ShowModel(vm);
                         context.IsBusy = false;
                     });
                 }
                 catch (Exception ex)
                 {
-                    _panel.Dispatcher.Invoke(() =>
+                    panel.Dispatcher.Invoke(() =>
                     {
-                        _panel.ShowError(ex.Message);
+                        panel.ShowError(ex.Message);
                         context.IsBusy = false;
                     });
                 }
