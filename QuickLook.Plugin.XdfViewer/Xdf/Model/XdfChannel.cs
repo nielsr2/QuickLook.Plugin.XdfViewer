@@ -5,5 +5,6 @@ namespace QuickLook.Plugin.XdfViewer.Xdf.Model
         public string Label { get; set; }
         public string Unit { get; set; }
         public string Type { get; set; }
+        public ChannelEnvelope Envelope { get; set; }
     }
 }
