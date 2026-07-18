@@ -12,6 +12,10 @@ namespace QuickLook.Plugin.XdfViewer.Xdf
     public static class XdfReader
     {
         public const int MaxMarkersPerStream = 500;
+        public const int SparklineBuckets = 100;
+        public const int ExpandedBuckets = 500;
+        public const long MaxEnvelopeSamplesPerStream = 20_000;
+        public const long MaxEnvelopeSamplesPerStreamHiRes = 200_000;
         private static readonly byte[] Magic = { 0x58, 0x44, 0x46, 0x3A }; // "XDF:"
 
         public static XdfFile Read(string path)
@@ -80,6 +84,144 @@ namespace QuickLook.Plugin.XdfViewer.Xdf
                 file.Streams.Add(s);
             }
             return file;
+        }
+
+        /// <summary>
+        /// Builds bounded, strided min/max envelopes (sparklines/waveform previews) for the numeric
+        /// streams in <paramref name="file"/>, re-reading <paramref name="path"/> independently of
+        /// <see cref="Read(string)"/>. Never throws; problem streams are simply omitted.
+        /// </summary>
+        public static StreamEnvelope[] FillEnvelopes(XdfFile file, string path, EnvelopeOptions opts)
+        {
+            using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read,
+                                           1 << 16, FileOptions.SequentialScan))
+                return FillEnvelopes(file, fs, opts);
+        }
+
+        /// <summary>See <see cref="FillEnvelopes(XdfFile, string, EnvelopeOptions)"/>.</summary>
+        public static StreamEnvelope[] FillEnvelopes(XdfFile file, Stream stream, EnvelopeOptions opts)
+        {
+            var result = new List<StreamEnvelope>();
+            if (file == null || stream == null) return result.ToArray();
+            opts = opts ?? new EnvelopeOptions();
+
+            var reader = new BinaryReader(stream, Encoding.UTF8, leaveOpen: true);
+
+            var magic = reader.ReadBytes(4);
+            if (magic.Length < 4 || !magic.SequenceEqual(Magic))
+                return result.ToArray();
+
+            // Pass 1 (index): walk chunks, decoding nothing, and record where each Samples chunk's
+            // value payload lives so Pass 2 can seek straight back to only the chunks it needs.
+            var chunksByStream = new Dictionary<uint, List<EnvelopeChunkRef>>();
+            try
+            {
+                while (stream.Position < stream.Length)
+                {
+                    long len = reader.ReadVarLength();
+                    long tagPos = stream.Position;
+                    long contentEnd = tagPos + len;
+                    if (len < 2 || contentEnd < tagPos || contentEnd > stream.Length)
+                        break;
+                    var tag = (XdfChunkTag)reader.ReadUInt16();
+
+                    if (tag == XdfChunkTag.Samples)
+                    {
+                        uint streamId = reader.ReadUInt32();
+                        long numSamples = reader.ReadVarLength();
+                        long valuesStart = stream.Position;
+
+                        if (!chunksByStream.TryGetValue(streamId, out var chunks))
+                        {
+                            chunks = new List<EnvelopeChunkRef>();
+                            chunksByStream[streamId] = chunks;
+                        }
+                        chunks.Add(new EnvelopeChunkRef
+                        {
+                            ValuesStart = valuesStart,
+                            ContentEnd = contentEnd,
+                            NumSamples = numSamples
+                        });
+                    }
+
+                    stream.Seek(contentEnd, SeekOrigin.Begin); // always resync to chunk boundary
+                }
+            }
+            catch (Exception) { /* stop indexing; decode whatever chunks were captured */ }
+
+            // Target streams: numeric channel format, at least one channel, at least one indexed
+            // sample, and matching the optional single-stream filter.
+            foreach (var s in file.Streams)
+            {
+                if (opts.OnlyStreamId.HasValue && s.Id != opts.OnlyStreamId.Value) continue;
+                if (s.ChannelCount <= 0) continue;
+                if (!XdfSampleFormat.TryGetNumeric(s.ChannelFormat, out _, out var read)) continue;
+                if (!chunksByStream.TryGetValue(s.Id, out var chunks) || chunks.Count == 0) continue;
+
+                long total = 0;
+                foreach (var c in chunks) total += c.NumSamples;
+                if (total <= 0) continue;
+
+                try
+                {
+                    result.Add(DecodeStreamEnvelope(reader, stream, s, chunks, total, read, opts));
+                }
+                catch (Exception)
+                {
+                    // Truncated/corrupt payload for this stream only: skip it, keep the rest.
+                }
+            }
+
+            return result.ToArray();
+        }
+
+        private static StreamEnvelope DecodeStreamEnvelope(BinaryReader reader, Stream stream, XdfStream s,
+            List<EnvelopeChunkRef> chunks, long total, Func<BinaryReader, double> read, EnvelopeOptions opts)
+        {
+            long cap = opts.MaxSamplesPerStream > 0 ? opts.MaxSamplesPerStream : 1;
+            int k = total <= cap ? 1 : (int)Math.Ceiling((double)total / cap);
+            bool approximate = k > 1;
+            int lastIndex = chunks.Count - 1;
+            int channelCount = s.ChannelCount;
+
+            var dec = new EnvelopeDecimator(channelCount, opts.Buckets);
+
+            long cumBefore = 0;
+            for (int ci = 0; ci < chunks.Count; ci++)
+            {
+                var chunk = chunks[ci];
+                if (ci % k == 0 || ci == lastIndex)
+                {
+                    stream.Seek(chunk.ValuesStart, SeekOrigin.Begin);
+                    for (long i = 0; i < chunk.NumSamples && stream.Position < chunk.ContentEnd; i++)
+                    {
+                        byte tsMarker = reader.ReadByte();
+                        if (tsMarker == 8) reader.ReadDouble();
+
+                        for (int c = 0; c < channelCount; c++)
+                        {
+                            double v = read(reader);
+                            long g = cumBefore + i;
+                            dec.Add(c, EnvelopeDecimator.BucketOf(g, total, opts.Buckets), v);
+                        }
+                    }
+                }
+                cumBefore += chunk.NumSamples;
+            }
+
+            return new StreamEnvelope
+            {
+                StreamId = s.Id,
+                Channels = dec.Build(approximate),
+                IsApproximate = approximate
+            };
+        }
+
+        private struct EnvelopeChunkRef
+        {
+            public long ValuesStart;
+            public long ContentEnd;
+            public long NumSamples;
         }
 
         private static string ReadXml(BinaryReader reader, long contentEnd)
