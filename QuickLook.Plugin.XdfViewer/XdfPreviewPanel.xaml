@@ -78,7 +78,7 @@
                                 <Border Background="Transparent" Cursor="Hand"
                                         MouseLeftButtonUp="ExpandedPlot_Click"
                                         ToolTip="Click for a full-window, scrollable view">
-                                  <controls:WaveformSparkline HorizontalAlignment="Stretch" Height="120"
+                                  <controls:WaveformSparkline HorizontalAlignment="Stretch" Height="120" Filled="True"
                                     Envelope="{Binding Detail}"
                                     LineBrush="{DynamicResource WaveformBrush}"/>
                                 </Border>
@@ -175,8 +175,9 @@
           <!-- Waveform (scrolls horizontally) -->
           <ScrollViewer x:Name="FullScroll" Grid.Column="1" Grid.Row="0"
                         HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
-                        ScrollChanged="FullScroll_ScrollChanged">
-            <controls:WaveformSparkline x:Name="FullWave" ShowGrid="True"
+                        ScrollChanged="FullScroll_ScrollChanged"
+                        PreviewMouseWheel="FullScroll_PreviewMouseWheel">
+            <controls:WaveformSparkline x:Name="FullWave" ShowGrid="True" Filled="True"
                        Height="{Binding ViewportHeight, ElementName=FullScroll}"
                        Envelope="{Binding FullDetail}"
                        LineBrush="{DynamicResource WaveformBrush}"/>

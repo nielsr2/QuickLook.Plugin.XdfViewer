@@ -204,6 +204,13 @@ namespace QuickLook.Plugin.XdfViewer
             TimeScroll?.ScrollToHorizontalOffset(FullScroll.HorizontalOffset);
         }
 
+        private void FullScroll_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            // Vertical scrolling is disabled here, so translate the wheel into horizontal panning.
+            FullScroll.ScrollToHorizontalOffset(FullScroll.HorizontalOffset - e.Delta);
+            e.Handled = true;
+        }
+
         /// <summary>Refreshes the amplitude-axis labels for the current channel + gain.</summary>
         private void UpdateYAxis()
         {
@@ -223,8 +230,10 @@ namespace QuickLook.Plugin.XdfViewer
 
             double gain = FullWave?.Gain ?? 1.0;
             if (gain < 1) gain = 1;
-            double center = (env.DataMin + env.DataMax) / 2.0;
-            double half = ((env.DataMax - env.DataMin) / 2.0) / gain;
+            double center = env.Center;
+            double halfRange = Math.Max(env.DataMax - center, center - env.DataMin);
+            if (halfRange <= 0) halfRange = (env.DataMax - env.DataMin) / 2.0;
+            double half = halfRange / gain;
             YMaxLabel.Text = FmtAxis(center + half);
             YMidLabel.Text = FmtAxis(center);
             YMinLabel.Text = FmtAxis(center - half);
