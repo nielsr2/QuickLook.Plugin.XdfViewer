@@ -70,5 +70,103 @@ namespace QuickLook.Plugin.XdfViewer.Tests
             Assert.Contains("1 stream", vm.Summary);
             Assert.Contains("XDF v1.0", vm.Summary);
         }
+
+        private static XdfOverviewViewModel BuildTwoChannelOverview(out XdfStream stream)
+        {
+            var file = new XdfFile { Version = "1.0" };
+            stream = new XdfStream
+            {
+                Id = 7, Name = "A", Type = "EEG", ChannelFormat = "float32",
+                ChannelCount = 2, NominalSampleRate = 512,
+                FirstTimestamp = 0, LastTimestamp = 63.5, SampleCount = 10
+            };
+            stream.Channels.Add(new XdfChannel { Label = "Fp1", Unit = "uV" });
+            stream.Channels.Add(new XdfChannel { Label = "Fp2", Unit = "uV" });
+            file.Streams.Add(stream);
+            return new XdfOverviewViewModel(file, "rec.xdf");
+        }
+
+        private static ChannelEnvelope MakeEnvelope(float min, float max) => new ChannelEnvelope
+        {
+            Min = new[] { min },
+            Max = new[] { max },
+            Filled = new[] { true },
+            BucketCount = 1,
+            DataMin = min,
+            DataMax = max,
+            IsApproximate = false,
+            IsEmpty = false
+        };
+
+        [Fact]
+        public void ApplyEnvelopes_MatchesByStreamId_SetsSparklineOnEachChannel()
+        {
+            var vm = BuildTwoChannelOverview(out var stream);
+            var env0 = MakeEnvelope(0f, 1f);
+            var env1 = MakeEnvelope(2f, 3f);
+
+            vm.ApplyEnvelopes(new[]
+            {
+                new StreamEnvelope { StreamId = stream.Id, Channels = new[] { env0, env1 } }
+            });
+
+            Assert.Same(env0, vm.Streams[0].Channels[0].Sparkline);
+            Assert.Same(env1, vm.Streams[0].Channels[1].Sparkline);
+            Assert.Null(vm.Streams[0].Channels[0].Detail);
+        }
+
+        [Fact]
+        public void ApplyEnvelopes_UnknownStreamId_IsIgnored()
+        {
+            var vm = BuildTwoChannelOverview(out _);
+
+            vm.ApplyEnvelopes(new[]
+            {
+                new StreamEnvelope { StreamId = 999, Channels = new[] { MakeEnvelope(0f, 1f) } }
+            });
+
+            Assert.Null(vm.Streams[0].Channels[0].Sparkline);
+        }
+
+        [Fact]
+        public void ApplyDetail_MatchesByStreamId_SetsDetailOnEachChannel()
+        {
+            var vm = BuildTwoChannelOverview(out var stream);
+            var env0 = MakeEnvelope(0f, 1f);
+            var env1 = MakeEnvelope(2f, 3f);
+
+            vm.ApplyDetail(new[]
+            {
+                new StreamEnvelope { StreamId = stream.Id, Channels = new[] { env0, env1 } }
+            });
+
+            Assert.Same(env0, vm.Streams[0].Channels[0].Detail);
+            Assert.Same(env1, vm.Streams[0].Channels[1].Detail);
+            Assert.Null(vm.Streams[0].Channels[0].Sparkline);
+        }
+
+        [Fact]
+        public void ApplyDetail_ShorterChannelArray_GuardsWithoutThrowing()
+        {
+            var vm = BuildTwoChannelOverview(out var stream);
+            var env0 = MakeEnvelope(0f, 1f);
+
+            var ex = Record.Exception(() => vm.ApplyDetail(new[]
+            {
+                new StreamEnvelope { StreamId = stream.Id, Channels = new[] { env0 } }
+            }));
+
+            Assert.Null(ex);
+            Assert.Same(env0, vm.Streams[0].Channels[0].Detail);
+            Assert.Null(vm.Streams[0].Channels[1].Detail);
+        }
+
+        [Fact]
+        public void ApplyDetail_NullArray_NoOp()
+        {
+            var vm = BuildTwoChannelOverview(out _);
+            var ex = Record.Exception(() => vm.ApplyDetail(null));
+            Assert.Null(ex);
+        }
     }
 }

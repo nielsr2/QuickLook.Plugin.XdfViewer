@@ -60,5 +60,35 @@ namespace QuickLook.Plugin.XdfViewer.ViewModels
                     stream.Channels[j].ApplyEnvelope(streamEnv.Channels[j]);
             }
         }
+
+        /// <summary>
+        /// Applies a freshly computed hi-res "detail" envelope (from an on-demand, single-stream
+        /// re-read) to the matching stream/channel view models' <see cref="ChannelViewModel.Detail"/>.
+        /// Must be called on the UI thread (the caller is responsible for marshalling).
+        /// </summary>
+        public void ApplyDetail(StreamEnvelope[] envelopes)
+        {
+            if (envelopes == null) return;
+
+            foreach (var streamEnv in envelopes)
+            {
+                if (streamEnv?.Channels == null) continue;
+
+                StreamCardViewModel stream = null;
+                foreach (var candidate in Streams)
+                {
+                    if (candidate.StreamId == streamEnv.StreamId)
+                    {
+                        stream = candidate;
+                        break;
+                    }
+                }
+                if (stream == null) continue;
+
+                var count = System.Math.Min(stream.Channels.Count, streamEnv.Channels.Length);
+                for (int j = 0; j < count; j++)
+                    stream.Channels[j].SetDetail(streamEnv.Channels[j]);
+            }
+        }
     }
 }

@@ -20,6 +20,9 @@ namespace QuickLook.Plugin.XdfViewer.ViewModels
         public string Label => _channel.Label;
         public string Unit => _channel.Unit;
 
+        /// <summary>Id of the owning stream (used to request an on-demand hi-res envelope read).</summary>
+        public uint StreamId => _stream.Id;
+
         /// <summary>Duration of the owning stream, in seconds (for the expanded time axis).</summary>
         public double? StreamDurationSeconds => _stream.Duration;
 
