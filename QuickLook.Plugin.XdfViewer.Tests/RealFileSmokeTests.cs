@@ -31,5 +31,46 @@ namespace QuickLook.Plugin.XdfViewer.Tests
             Assert.NotEmpty(file.Streams);
             Assert.Contains(file.Streams, s => s.ChannelCount > 0);
         }
+
+        [Fact]
+        public void RealFile_FillEnvelopes_ProducesBoundedFiniteWaveformsWhenPresent()
+        {
+            var path = SamplePath();
+            if (path == null) return; // skipped when the sample is absent
+
+            var file = XdfReader.Read(path);
+            if (file == null) return; // don't hard-fail CI on an unreadable local sample
+
+            var envs = XdfReader.FillEnvelopes(file, path, new EnvelopeOptions
+            {
+                Buckets = XdfReader.SparklineBuckets,
+                MaxSamplesPerStream = XdfReader.MaxEnvelopeSamplesPerStream
+            });
+
+            // The sample (Trigno) recording has numeric streams, so this should yield envelopes.
+            Assert.NotEmpty(envs);
+
+            foreach (var se in envs)
+            {
+                Assert.NotEmpty(se.Channels);
+
+                bool anyChannelNonEmpty = false;
+                foreach (var ch in se.Channels)
+                {
+                    Assert.Equal(XdfReader.SparklineBuckets, ch.BucketCount);
+
+                    if (!ch.IsEmpty)
+                        anyChannelNonEmpty = true;
+
+                    Assert.False(float.IsNaN(ch.DataMin));
+                    Assert.False(float.IsInfinity(ch.DataMin));
+                    Assert.False(float.IsNaN(ch.DataMax));
+                    Assert.False(float.IsInfinity(ch.DataMax));
+                    Assert.True(ch.DataMin <= ch.DataMax);
+                }
+
+                Assert.True(anyChannelNonEmpty, $"stream {se.StreamId} has no non-empty channels");
+            }
+        }
     }
 }
