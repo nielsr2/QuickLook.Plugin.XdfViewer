@@ -31,5 +31,34 @@ namespace QuickLook.Plugin.XdfViewer.ViewModels
         public string Summary { get; }
         public bool IsTruncated { get; }
         public ObservableCollection<StreamCardViewModel> Streams { get; }
+
+        /// <summary>
+        /// Applies freshly computed sparkline envelopes to the matching stream/channel view models.
+        /// Must be called on the UI thread (the caller is responsible for marshalling).
+        /// </summary>
+        public void ApplyEnvelopes(StreamEnvelope[] envelopes)
+        {
+            if (envelopes == null) return;
+
+            foreach (var streamEnv in envelopes)
+            {
+                if (streamEnv?.Channels == null) continue;
+
+                StreamCardViewModel stream = null;
+                foreach (var candidate in Streams)
+                {
+                    if (candidate.StreamId == streamEnv.StreamId)
+                    {
+                        stream = candidate;
+                        break;
+                    }
+                }
+                if (stream == null) continue;
+
+                var count = System.Math.Min(stream.Channels.Count, streamEnv.Channels.Length);
+                for (int j = 0; j < count; j++)
+                    stream.Channels[j].ApplyEnvelope(streamEnv.Channels[j]);
+            }
+        }
     }
 }

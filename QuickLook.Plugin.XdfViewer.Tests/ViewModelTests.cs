@@ -24,6 +24,27 @@ namespace QuickLook.Plugin.XdfViewer.Tests
         }
 
         [Fact]
+        public void StreamCard_ChannelViewModels_ExposeLabelAndUnit()
+        {
+            var s = new XdfStream
+            {
+                Name = "BioSemi", Type = "EEG", ChannelCount = 2,
+                ChannelFormat = "float32", NominalSampleRate = 512,
+                FirstTimestamp = 0, LastTimestamp = 63.5, SampleCount = 32512
+            };
+            s.Channels.Add(new XdfChannel { Label = "Fp1", Unit = "uV", Type = "EEG" });
+            s.Channels.Add(new XdfChannel { Label = "Fp2", Unit = "uV", Type = "EEG" });
+
+            var vm = new StreamCardViewModel(s);
+
+            Assert.Equal(2, vm.Channels.Count);
+            Assert.Equal("Fp1", vm.Channels[0].Label);
+            Assert.Equal("uV", vm.Channels[0].Unit);
+            Assert.Equal("Fp2", vm.Channels[1].Label);
+            Assert.Equal("2 channels", vm.ExpanderHeader);
+        }
+
+        [Fact]
         public void IrregularMarkerCard_UsesIrregularLabel()
         {
             var s = new XdfStream

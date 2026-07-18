@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using QuickLook.Plugin.XdfViewer.Xdf.Model;
 
 namespace QuickLook.Plugin.XdfViewer.ViewModels
@@ -31,7 +32,8 @@ namespace QuickLook.Plugin.XdfViewer.ViewModels
 
             IsIncomplete = s.IsIncomplete;
             IsMarkerStream = s.IsMarkerStream;
-            Channels = s.Channels;
+            StreamId = s.Id;
+            Channels = s.Channels.Select(c => new ChannelViewModel(c, s)).ToList();
             Markers = s.Markers;
             MarkersTruncated = s.MarkersTruncated;
 
@@ -47,7 +49,8 @@ namespace QuickLook.Plugin.XdfViewer.ViewModels
         public string ExpanderHeader { get; }
         public bool IsIncomplete { get; }
         public bool IsMarkerStream { get; }
-        public IReadOnlyList<XdfChannel> Channels { get; }
+        public uint StreamId { get; }
+        public IReadOnlyList<ChannelViewModel> Channels { get; }
         public IReadOnlyList<XdfMarker> Markers { get; }
         public bool MarkersTruncated { get; }
 
