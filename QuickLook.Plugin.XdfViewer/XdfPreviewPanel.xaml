@@ -60,17 +60,18 @@
                             <StackPanel Margin="0,1">
                               <Border Background="Transparent" Cursor="Hand"
                                       MouseLeftButtonUp="ChannelRow_MouseLeftButtonUp">
-                                <StackPanel Orientation="Horizontal">
-                                  <TextBlock Opacity="0.85" VerticalAlignment="Center">
-                                    <Run Text="{Binding Label, Mode=OneWay}"/>
-                                    <Run Text="{Binding Unit, Mode=OneWay}" FontStyle="Italic" Foreground="#888"/>
-                                  </TextBlock>
-                                  <controls:WaveformSparkline Width="100" Height="16" Margin="8,0,0,0"
+                                <DockPanel>
+                                  <!-- Sparkline docked right so it aligns across rows regardless of label width -->
+                                  <controls:WaveformSparkline DockPanel.Dock="Right" Width="100" Height="16" Margin="8,0,0,0"
                                     VerticalAlignment="Center"
                                     Envelope="{Binding Sparkline}"
                                     LineBrush="{DynamicResource WaveformBrush}"
                                     Visibility="{Binding HasWaveform, Converter={StaticResource BoolToVis}}"/>
-                                </StackPanel>
+                                  <TextBlock Opacity="0.85" VerticalAlignment="Center" TextTrimming="CharacterEllipsis">
+                                    <Run Text="{Binding Label, Mode=OneWay}"/>
+                                    <Run Text="{Binding Unit, Mode=OneWay}" FontStyle="Italic" Foreground="#888"/>
+                                  </TextBlock>
+                                </DockPanel>
                               </Border>
                               <StackPanel Margin="0,4,0,6"
                                           Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVis}}">
