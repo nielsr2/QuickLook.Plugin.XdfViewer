@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using QuickLook.Common.Plugin;
 using QuickLook.Plugin.XdfViewer.Xdf;
+using QuickLook.Plugin.XdfViewer.Xdf.Model;
 using QuickLook.Plugin.XdfViewer.ViewModels;
 
 namespace QuickLook.Plugin.XdfViewer
@@ -38,10 +39,15 @@ namespace QuickLook.Plugin.XdfViewer
 
             Task.Run(() =>
             {
+                XdfFile file = null;
+                XdfOverviewViewModel vm = null;
+
+                // Phase 1: read the file structure and show the overview immediately. This must
+                // stay instant, so it only does the cheap structural parse (no sample decoding).
                 try
                 {
-                    var file = XdfReader.Read(path);
-                    var vm = file == null ? null : new XdfOverviewViewModel(file, fileName);
+                    file = XdfReader.Read(path);
+                    vm = file == null ? null : new XdfOverviewViewModel(file, fileName);
                     panel.Dispatcher.Invoke(() =>
                     {
                         panel.ShowModel(vm);
@@ -55,6 +61,29 @@ namespace QuickLook.Plugin.XdfViewer
                         panel.ShowError(ex.Message);
                         context.IsBusy = false;
                     });
+                    return;
+                }
+
+                if (file == null || vm == null) return;
+
+                // Phase 2: background sparkline pass. Runs after the overview is already on screen;
+                // a failure here must not disturb the overview that Phase 1 already showed, so it's
+                // isolated in its own try/catch and never calls ShowError.
+                try
+                {
+                    panel.Dispatcher.Invoke(() => panel.SetDataSource(path, file));
+
+                    var envs = XdfReader.FillEnvelopes(file, path, new EnvelopeOptions
+                    {
+                        Buckets = XdfReader.SparklineBuckets,
+                        MaxSamplesPerStream = XdfReader.MaxEnvelopeSamplesPerStream
+                    });
+                    panel.Dispatcher.Invoke(() => panel.ApplyEnvelopes(envs));
+                }
+                catch (Exception)
+                {
+                    // Swallow: the overview already succeeded and is on screen. No sparklines is a
+                    // degraded-but-fine outcome, not an error worth surfacing over a good preview.
                 }
             });
         }
