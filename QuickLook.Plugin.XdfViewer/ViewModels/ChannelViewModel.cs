@@ -7,14 +7,17 @@ namespace QuickLook.Plugin.XdfViewer.ViewModels
     {
         private readonly XdfChannel _channel;
         private readonly XdfStream _stream;
+        private readonly int _channelIndex;
         private ChannelEnvelope _sparkline;
         private ChannelEnvelope _detail;
+        private ChannelEnvelope _fullDetail;
         private bool _isExpanded;
 
-        public ChannelViewModel(XdfChannel channel, XdfStream stream)
+        public ChannelViewModel(XdfChannel channel, XdfStream stream, int channelIndex = 0)
         {
             _channel = channel;
             _stream = stream;
+            _channelIndex = channelIndex;
         }
 
         public string Label => _channel.Label;
@@ -22,6 +25,12 @@ namespace QuickLook.Plugin.XdfViewer.ViewModels
 
         /// <summary>Id of the owning stream (used to request an on-demand hi-res envelope read).</summary>
         public uint StreamId => _stream.Id;
+
+        /// <summary>Index of this channel within its stream (to pick its envelope out of a StreamEnvelope).</summary>
+        public int ChannelIndex => _channelIndex;
+
+        /// <summary>Total sample count of the owning stream (to size the full-resolution view).</summary>
+        public long? StreamSampleCount => _stream.SampleCount;
 
         /// <summary>Duration of the owning stream, in seconds (for the expanded time axis).</summary>
         public double? StreamDurationSeconds => _stream.Duration;
@@ -44,6 +53,17 @@ namespace QuickLook.Plugin.XdfViewer.ViewModels
             {
                 _detail = value;
                 Raise(nameof(Detail));
+            }
+        }
+
+        /// <summary>Full-resolution envelope for the entire channel (the full-window scrollable view).</summary>
+        public ChannelEnvelope FullDetail
+        {
+            get => _fullDetail;
+            private set
+            {
+                _fullDetail = value;
+                Raise(nameof(FullDetail));
             }
         }
 
@@ -76,6 +96,11 @@ namespace QuickLook.Plugin.XdfViewer.ViewModels
         public void SetDetail(ChannelEnvelope detail)
         {
             Detail = detail;
+        }
+
+        public void SetFullDetail(ChannelEnvelope full)
+        {
+            FullDetail = full;
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

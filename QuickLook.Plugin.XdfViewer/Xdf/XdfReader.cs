@@ -16,6 +16,8 @@ namespace QuickLook.Plugin.XdfViewer.Xdf
         public const int ExpandedBuckets = 500;
         public const long MaxEnvelopeSamplesPerStream = 20_000;
         public const long MaxEnvelopeSamplesPerStreamHiRes = 200_000;
+        public const long MaxEnvelopeSamplesPerStreamFull = 5_000_000;
+        public const int MaxFullBuckets = 8_000;
         private static readonly byte[] Magic = { 0x58, 0x44, 0x46, 0x3A }; // "XDF:"
 
         public static XdfFile Read(string path)

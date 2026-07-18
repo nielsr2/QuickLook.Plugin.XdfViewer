@@ -75,9 +75,13 @@
                               </Border>
                               <StackPanel Margin="0,4,0,6"
                                           Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVis}}">
-                                <controls:WaveformSparkline HorizontalAlignment="Stretch" Height="120"
-                                  Envelope="{Binding Detail}"
-                                  LineBrush="{DynamicResource WaveformBrush}"/>
+                                <Border Background="Transparent" Cursor="Hand"
+                                        MouseLeftButtonUp="ExpandedPlot_Click"
+                                        ToolTip="Click for a full-window, scrollable view">
+                                  <controls:WaveformSparkline HorizontalAlignment="Stretch" Height="120"
+                                    Envelope="{Binding Detail}"
+                                    LineBrush="{DynamicResource WaveformBrush}"/>
+                                </Border>
                                 <TextBlock Opacity="0.6" FontSize="10" Margin="0,2,0,0">
                                   <Run Text="{Binding Detail.DataMin, Mode=OneWay, StringFormat={}{0:0.###}}"/>
                                   <Run Text=" → "/>
@@ -122,5 +126,31 @@
         </ItemsControl>
       </ScrollViewer>
     </DockPanel>
+
+    <!-- Full-window, horizontally-scrollable view of one channel (the 3rd zoom level).
+         Overlays the whole panel; DataContext is set to the clicked ChannelViewModel. -->
+    <Grid x:Name="FullView" Visibility="Collapsed"
+          Background="{DynamicResource PanelBackground}">
+      <DockPanel>
+        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,4">
+          <Button DockPanel.Dock="Right" Content="✕ Close" Padding="10,3" Cursor="Hand"
+                  Background="Transparent" BorderThickness="0"
+                  Foreground="{DynamicResource WaveformBrush}"
+                  Click="CloseFullView_Click"/>
+          <TextBlock x:Name="FullViewTitle" FontSize="15" FontWeight="SemiBold"
+                     VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+        </DockPanel>
+        <TextBlock x:Name="FullViewSubtitle" DockPanel.Dock="Top" Opacity="0.6"
+                   FontSize="11" Margin="0,0,0,8"/>
+        <ScrollViewer x:Name="FullScroll"
+                      HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Disabled">
+          <controls:WaveformSparkline x:Name="FullWave"
+                     Height="{Binding ViewportHeight, ElementName=FullScroll}"
+                     Envelope="{Binding FullDetail}"
+                     LineBrush="{DynamicResource WaveformBrush}"/>
+        </ScrollViewer>
+      </DockPanel>
+    </Grid>
   </Grid>
 </UserControl>

@@ -33,7 +33,7 @@ namespace QuickLook.Plugin.XdfViewer.ViewModels
             IsIncomplete = s.IsIncomplete;
             IsMarkerStream = s.IsMarkerStream;
             StreamId = s.Id;
-            Channels = s.Channels.Select(c => new ChannelViewModel(c, s)).ToList();
+            Channels = s.Channels.Select((c, i) => new ChannelViewModel(c, s, i)).ToList();
             Markers = s.Markers;
             MarkersTruncated = s.MarkersTruncated;
 

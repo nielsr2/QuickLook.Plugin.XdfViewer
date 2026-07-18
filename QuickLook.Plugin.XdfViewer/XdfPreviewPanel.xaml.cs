@@ -23,6 +23,9 @@ namespace QuickLook.Plugin.XdfViewer
         {
             Resources.Add("BoolToVis", new BooleanToVisibilityConverter());
             Resources.Add("InverseBoolToVis", new InverseBooleanToVisibilityConverter());
+            // Opaque backdrop for the full-window overlay so the cards behind it are hidden.
+            // Overridden per-theme in ApplyTheme; this dark default covers Themes.None.
+            Resources["PanelBackground"] = new SolidColorBrush(Color.FromRgb(0x1E, 0x1E, 0x1E));
             InitializeComponent();
         }
 
@@ -98,6 +101,82 @@ namespace QuickLook.Plugin.XdfViewer
             });
         }
 
+        /// <summary>
+        /// Click on the expanded (mid-size) plot: opens the full-window, horizontally-scrollable
+        /// view of that single channel and kicks off a full-resolution read (cached per channel).
+        /// </summary>
+        private void ExpandedPlot_Click(object sender, MouseButtonEventArgs e)
+        {
+            if (!(sender is FrameworkElement fe) || !(fe.DataContext is ChannelViewModel cvm)) return;
+            e.Handled = true;
+            ShowFullChannel(cvm);
+        }
+
+        private void ShowFullChannel(ChannelViewModel cvm)
+        {
+            // Size the content so it's wider than the viewport (=> horizontally scrollable): one
+            // bucket per sample up to a cap, ~2px per bucket, but never narrower than the panel.
+            long n = cvm.StreamSampleCount ?? 4000;
+            int buckets = (int)Math.Max(200, Math.Min(n, XdfReader.MaxFullBuckets));
+            double width = Math.Max(ActualWidth - 40, buckets * 2.0);
+
+            FullView.DataContext = cvm;
+            FullViewTitle.Text = string.IsNullOrEmpty(cvm.Unit) ? cvm.Label : cvm.Label + "   " + cvm.Unit;
+            FullViewSubtitle.Text = BuildFullSubtitle(cvm);
+            FullWave.Width = width;
+            FullView.Visibility = Visibility.Visible;
+
+            if (cvm.FullDetail != null) return;                      // already loaded — reuse
+            if (_file == null || string.IsNullOrEmpty(_path)) return;
+
+            var file = _file;
+            var path = _path;
+            var streamId = cvm.StreamId;
+            var channelIndex = cvm.ChannelIndex;
+            var dispatcher = Dispatcher;
+
+            Task.Run(() =>
+            {
+                try
+                {
+                    var result = XdfReader.FillEnvelopes(file, path, new EnvelopeOptions
+                    {
+                        OnlyStreamId = streamId,
+                        Buckets = buckets,
+                        MaxSamplesPerStream = XdfReader.MaxEnvelopeSamplesPerStreamFull
+                    });
+                    dispatcher.Invoke(() =>
+                    {
+                        var se = (result != null && result.Length > 0) ? result[0] : null;
+                        if (se?.Channels != null && channelIndex >= 0 && channelIndex < se.Channels.Length)
+                            cvm.SetFullDetail(se.Channels[channelIndex]);
+                    });
+                }
+                catch (Exception)
+                {
+                    // Keep the (empty) full view open rather than crashing; FullDetail stays null.
+                }
+            });
+        }
+
+        private static string BuildFullSubtitle(ChannelViewModel cvm)
+        {
+            var ci = System.Globalization.CultureInfo.InvariantCulture;
+            var sb = new System.Text.StringBuilder("full resolution");
+            if (cvm.StreamSampleCount.HasValue)
+                sb.Append(" · ").Append(cvm.StreamSampleCount.Value.ToString("N0", ci)).Append(" samples");
+            if (cvm.StreamDurationSeconds.HasValue)
+                sb.Append(" · ").Append(cvm.StreamDurationSeconds.Value.ToString("0.0", ci)).Append(" s");
+            sb.Append("   ·   scroll horizontally →");
+            return sb.ToString();
+        }
+
+        private void CloseFullView_Click(object sender, RoutedEventArgs e)
+        {
+            FullView.Visibility = Visibility.Collapsed;
+            FullView.DataContext = null;
+        }
+
         public void ApplyTheme(QuickLook.Common.Plugin.Themes theme)
         {
             // Set an explicit foreground so text stays readable regardless of the host chrome,
@@ -109,12 +188,14 @@ namespace QuickLook.Plugin.XdfViewer
                 var brush = new SolidColorBrush(Color.FromRgb(0xEC, 0xEC, 0xEC));
                 Foreground = brush;
                 Resources["WaveformBrush"] = brush;
+                Resources["PanelBackground"] = new SolidColorBrush(Color.FromRgb(0x1E, 0x1E, 0x1E));
             }
             else if (theme == QuickLook.Common.Plugin.Themes.Light)
             {
                 var brush = new SolidColorBrush(Color.FromRgb(0x1A, 0x1A, 0x1A));
                 Foreground = brush;
                 Resources["WaveformBrush"] = brush;
+                Resources["PanelBackground"] = new SolidColorBrush(Color.FromRgb(0xF5, 0xF5, 0xF5));
             }
             // Themes.None: leave the inherited default (Foreground unset, and sparklines fall
             // back to WaveformSparkline's own built-in default brush since WaveformBrush is
