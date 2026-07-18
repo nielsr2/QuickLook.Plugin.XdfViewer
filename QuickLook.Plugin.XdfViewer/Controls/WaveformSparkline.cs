@@ -68,6 +68,9 @@ namespace QuickLook.Plugin.XdfViewer.Controls
         {
             base.OnRenderSizeChanged(sizeInfo);
             InvalidateGeometryCache();
+            // A size-only change does not auto-trigger OnRender for a custom-drawn
+            // FrameworkElement; the geometry is pixel-absolute, so force a redraw.
+            InvalidateVisual();
         }
 
         protected override void OnRender(DrawingContext dc)
