@@ -79,5 +79,38 @@ namespace QuickLook.Plugin.XdfViewer.Tests
         {
             Assert.Equal(0d, WaveformSparkline.MapY(15d, 0d, 10d, 100d));
         }
+
+        [Fact]
+        public void MapYGain_Gain1_MatchesMapY()
+        {
+            // Gain 1 is the identity: min -> bottom, max -> top, mid -> centre.
+            Assert.Equal(100d, WaveformSparkline.MapYGain(0d, 0d, 10d, 100d, 1d));
+            Assert.Equal(0d, WaveformSparkline.MapYGain(10d, 0d, 10d, 100d, 1d));
+            Assert.Equal(50d, WaveformSparkline.MapYGain(5d, 0d, 10d, 100d, 1d));
+        }
+
+        [Fact]
+        public void MapYGain_Gain2_ZoomsAboutCentre()
+        {
+            // Range 0..10, centre 5, height 100. At gain 2 the visible half-range is 2.5,
+            // so value 7.5 maps to the top (0) and 2.5 to the bottom (100); centre stays 50.
+            Assert.Equal(50d, WaveformSparkline.MapYGain(5d, 0d, 10d, 100d, 2d));
+            Assert.Equal(0d, WaveformSparkline.MapYGain(7.5d, 0d, 10d, 100d, 2d));
+            Assert.Equal(100d, WaveformSparkline.MapYGain(2.5d, 0d, 10d, 100d, 2d));
+        }
+
+        [Fact]
+        public void MapYGain_ClampsBeyondVisibleRange()
+        {
+            // With gain 2, anything past the visible ±2.5 window clamps to the edges.
+            Assert.Equal(0d, WaveformSparkline.MapYGain(10d, 0d, 10d, 100d, 2d));
+            Assert.Equal(100d, WaveformSparkline.MapYGain(0d, 0d, 10d, 100d, 2d));
+        }
+
+        [Fact]
+        public void MapYGain_FlatRange_ReturnsMidHeight()
+        {
+            Assert.Equal(50d, WaveformSparkline.MapYGain(5d, 5d, 5d, 100d, 3d));
+        }
     }
 }

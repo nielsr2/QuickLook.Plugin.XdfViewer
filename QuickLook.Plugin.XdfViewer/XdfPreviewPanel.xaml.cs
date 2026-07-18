@@ -18,6 +18,7 @@ namespace QuickLook.Plugin.XdfViewer
         private string _path;
         private XdfFile _file;
         private XdfOverviewViewModel _vm;
+        private ChannelViewModel _fullChannel;   // the channel currently shown in the full-window view
 
         public XdfPreviewPanel()
         {
@@ -118,13 +119,22 @@ namespace QuickLook.Plugin.XdfViewer
             // bucket per sample up to a cap, ~2px per bucket, but never narrower than the panel.
             long n = cvm.StreamSampleCount ?? 4000;
             int buckets = (int)Math.Max(200, Math.Min(n, XdfReader.MaxFullBuckets));
-            double width = Math.Max(ActualWidth - 40, buckets * 2.0);
+            double width = Math.Max(ActualWidth - 100, buckets * 2.0);
 
+            _fullChannel = cvm;
             FullView.DataContext = cvm;
             FullViewTitle.Text = string.IsNullOrEmpty(cvm.Unit) ? cvm.Label : cvm.Label + "   " + cvm.Unit;
             FullViewSubtitle.Text = BuildFullSubtitle(cvm);
+
             FullWave.Width = width;
+            FullWave.Gain = 1.0;
+            GainSlider.Value = 1.0;
+            GainLabel.Text = "×1";
+            TimeAxisEl.Width = width;
+            TimeAxisEl.DurationSeconds = cvm.StreamDurationSeconds ?? 0.0;
+
             FullView.Visibility = Visibility.Visible;
+            UpdateYAxis();
 
             if (cvm.FullDetail != null) return;                      // already loaded — reuse
             if (_file == null || string.IsNullOrEmpty(_path)) return;
@@ -150,6 +160,7 @@ namespace QuickLook.Plugin.XdfViewer
                         var se = (result != null && result.Length > 0) ? result[0] : null;
                         if (se?.Channels != null && channelIndex >= 0 && channelIndex < se.Channels.Length)
                             cvm.SetFullDetail(se.Channels[channelIndex]);
+                        if (ReferenceEquals(_fullChannel, cvm)) UpdateYAxis();
                     });
                 }
                 catch (Exception)
@@ -175,7 +186,52 @@ namespace QuickLook.Plugin.XdfViewer
         {
             FullView.Visibility = Visibility.Collapsed;
             FullView.DataContext = null;
+            _fullChannel = null;
         }
+
+        private void GainSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (FullWave == null) return; // fired during InitializeComponent before the wave exists
+            FullWave.Gain = e.NewValue;
+            if (GainLabel != null)
+                GainLabel.Text = "×" + e.NewValue.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+            UpdateYAxis();
+        }
+
+        private void FullScroll_ScrollChanged(object sender, ScrollChangedEventArgs e)
+        {
+            // Keep the time axis aligned under the waveform as it scrolls horizontally.
+            TimeScroll?.ScrollToHorizontalOffset(FullScroll.HorizontalOffset);
+        }
+
+        /// <summary>Refreshes the amplitude-axis labels for the current channel + gain.</summary>
+        private void UpdateYAxis()
+        {
+            if (YMaxLabel == null) return;
+            var env = _fullChannel?.FullDetail;
+            if (env == null || env.IsEmpty)
+            {
+                YMaxLabel.Text = YMidLabel.Text = YMinLabel.Text = "";
+                return;
+            }
+            if (env.DataMax <= env.DataMin) // flat channel
+            {
+                YMidLabel.Text = FmtAxis(env.DataMin);
+                YMaxLabel.Text = YMinLabel.Text = "";
+                return;
+            }
+
+            double gain = FullWave?.Gain ?? 1.0;
+            if (gain < 1) gain = 1;
+            double center = (env.DataMin + env.DataMax) / 2.0;
+            double half = ((env.DataMax - env.DataMin) / 2.0) / gain;
+            YMaxLabel.Text = FmtAxis(center + half);
+            YMidLabel.Text = FmtAxis(center);
+            YMinLabel.Text = FmtAxis(center - half);
+        }
+
+        private static string FmtAxis(double v)
+            => v.ToString("G4", System.Globalization.CultureInfo.InvariantCulture);
 
         public void ApplyTheme(QuickLook.Common.Plugin.Themes theme)
         {

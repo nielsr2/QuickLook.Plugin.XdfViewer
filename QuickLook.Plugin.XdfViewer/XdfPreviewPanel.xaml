@@ -131,7 +131,7 @@
          Overlays the whole panel; DataContext is set to the clicked ChannelViewModel. -->
     <Grid x:Name="FullView" Visibility="Collapsed"
           Background="{DynamicResource PanelBackground}">
-      <DockPanel>
+      <DockPanel Margin="4">
         <DockPanel DockPanel.Dock="Top" Margin="0,0,0,4">
           <Button DockPanel.Dock="Right" Content="✕ Close" Padding="10,3" Cursor="Hand"
                   Background="Transparent" BorderThickness="0"
@@ -141,15 +141,53 @@
                      VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
         </DockPanel>
         <TextBlock x:Name="FullViewSubtitle" DockPanel.Dock="Top" Opacity="0.6"
-                   FontSize="11" Margin="0,0,0,8"/>
-        <ScrollViewer x:Name="FullScroll"
-                      HorizontalScrollBarVisibility="Auto"
-                      VerticalScrollBarVisibility="Disabled">
-          <controls:WaveformSparkline x:Name="FullWave"
-                     Height="{Binding ViewportHeight, ElementName=FullScroll}"
-                     Envelope="{Binding FullDetail}"
-                     LineBrush="{DynamicResource WaveformBrush}"/>
-        </ScrollViewer>
+                   FontSize="11" Margin="0,0,0,6"/>
+        <!-- Vertical-scale (amplitude gain) control -->
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+          <TextBlock Text="Vertical scale" Opacity="0.7" FontSize="11" VerticalAlignment="Center"/>
+          <Slider x:Name="GainSlider" Minimum="1" Maximum="25" Value="1" Width="180"
+                  Margin="8,0" VerticalAlignment="Center"
+                  ValueChanged="GainSlider_ValueChanged"/>
+          <TextBlock x:Name="GainLabel" Text="×1" Opacity="0.7" FontSize="11"
+                     VerticalAlignment="Center" MinWidth="34"/>
+        </StackPanel>
+        <!-- Plot: fixed amplitude axis (left) + horizontally-scrollable waveform, time axis below -->
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+          </Grid.ColumnDefinitions>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+          </Grid.RowDefinitions>
+          <!-- Amplitude (Y) axis: sized to the waveform's viewport so labels line up -->
+          <Grid Grid.Column="0" Grid.Row="0" Width="62" Margin="0,0,4,0"
+                VerticalAlignment="Top"
+                Height="{Binding ViewportHeight, ElementName=FullScroll}">
+            <TextBlock x:Name="YMaxLabel" VerticalAlignment="Top" HorizontalAlignment="Right"
+                       FontSize="10" Opacity="0.7"/>
+            <TextBlock x:Name="YMidLabel" VerticalAlignment="Center" HorizontalAlignment="Right"
+                       FontSize="10" Opacity="0.7"/>
+            <TextBlock x:Name="YMinLabel" VerticalAlignment="Bottom" HorizontalAlignment="Right"
+                       FontSize="10" Opacity="0.7"/>
+          </Grid>
+          <!-- Waveform (scrolls horizontally) -->
+          <ScrollViewer x:Name="FullScroll" Grid.Column="1" Grid.Row="0"
+                        HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
+                        ScrollChanged="FullScroll_ScrollChanged">
+            <controls:WaveformSparkline x:Name="FullWave" ShowGrid="True"
+                       Height="{Binding ViewportHeight, ElementName=FullScroll}"
+                       Envelope="{Binding FullDetail}"
+                       LineBrush="{DynamicResource WaveformBrush}"/>
+          </ScrollViewer>
+          <!-- Time (X) axis: scrolls in lock-step with the waveform -->
+          <ScrollViewer x:Name="TimeScroll" Grid.Column="1" Grid.Row="1"
+                        HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
+            <controls:TimeAxis x:Name="TimeAxisEl" Height="22"
+                       LabelBrush="{DynamicResource WaveformBrush}"/>
+          </ScrollViewer>
+        </Grid>
       </DockPanel>
     </Grid>
   </Grid>
