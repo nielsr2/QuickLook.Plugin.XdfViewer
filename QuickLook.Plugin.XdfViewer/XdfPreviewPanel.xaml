@@ -74,7 +74,7 @@
                               </Border>
                               <StackPanel Margin="0,4,0,6"
                                           Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVis}}">
-                                <controls:WaveformSparkline Width="500" Height="120"
+                                <controls:WaveformSparkline HorizontalAlignment="Stretch" Height="120"
                                   Envelope="{Binding Detail}"
                                   LineBrush="{DynamicResource WaveformBrush}"/>
                                 <TextBlock Opacity="0.6" FontSize="10" Margin="0,2,0,0">
