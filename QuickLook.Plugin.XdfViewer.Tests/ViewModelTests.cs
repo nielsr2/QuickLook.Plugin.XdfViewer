@@ -19,7 +19,7 @@ namespace QuickLook.Plugin.XdfViewer.Tests
             Assert.Equal("BioSemi · EEG", vm.Title);
             Assert.Equal("5 ch · float32", vm.ChannelsLine);
             Assert.Equal("512 Hz · 32,512 samples", vm.RateLine);
-            Assert.StartsWith("63.5 s", vm.DurationLine);
+            Assert.Equal("1m 03s", vm.DurationLine); // 63.5 s rolls up to minutes
             Assert.False(vm.IsIncomplete);
         }
 
@@ -69,6 +69,47 @@ namespace QuickLook.Plugin.XdfViewer.Tests
             Assert.Single(vm.Streams);
             Assert.Contains("1 stream", vm.Summary);
             Assert.Contains("XDF v1.0", vm.Summary);
+        }
+
+        [Fact]
+        public void Overview_FooterlessStream_DerivesDurationFromSampleCountAndRate()
+        {
+            var file = new XdfFile();
+            // No first/last timestamps (interrupted recording); 30000 samples @ 100 Hz = 300 s.
+            file.Streams.Add(new XdfStream
+            {
+                Name = "A", ChannelFormat = "float32", ChannelCount = 1,
+                NominalSampleRate = 100, SampleCount = 30000
+            });
+            var vm = new XdfOverviewViewModel(file, "rec.xdf");
+            Assert.Contains("5m 00s", vm.Summary); // 300 s
+        }
+
+        [Fact]
+        public void MarkerCard_ShowsTimesRelativeToRecordingStart()
+        {
+            var file = new XdfFile();
+            file.Streams.Add(new XdfStream
+            {
+                Name = "Data", ChannelFormat = "float32", ChannelCount = 1,
+                NominalSampleRate = 100, FirstTimestamp = 1000, LastTimestamp = 1005, SampleCount = 500
+            });
+            var markers = new XdfStream { Name = "Markers", ChannelFormat = "string", ChannelCount = 1 };
+            markers.Markers.Add(new XdfMarker { Timestamp = 1002.5, Value = "go" });
+            file.Streams.Add(markers);
+
+            var vm = new XdfOverviewViewModel(file, "rec.xdf");
+            var markerCard = vm.Streams[1];
+            Assert.True(markerCard.IsMarkerStream);
+            Assert.Equal("2.50 s", markerCard.Markers[0].TimeLabel); // 1002.5 - 1000
+            Assert.Equal("go", markerCard.Markers[0].Value);
+        }
+
+        [Fact]
+        public void Marker_NoRecordingStart_FallsBackToRawTimestamp()
+        {
+            var mvm = new MarkerViewModel(new XdfMarker { Timestamp = 12.34, Value = "x" }, null);
+            Assert.Equal("12.34 s", mvm.TimeLabel);
         }
 
         private static XdfOverviewViewModel BuildTwoChannelOverview(out XdfStream stream)

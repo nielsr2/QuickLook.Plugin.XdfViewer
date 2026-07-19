@@ -267,7 +267,7 @@ namespace QuickLook.Plugin.XdfViewer
             if (cvm.StreamSampleCount.HasValue)
                 sb.Append(" · ").Append(cvm.StreamSampleCount.Value.ToString("N0", ci)).Append(" samples");
             if (cvm.StreamDurationSeconds.HasValue)
-                sb.Append(" · ").Append(cvm.StreamDurationSeconds.Value.ToString("0.0", ci)).Append(" s");
+                sb.Append(" · ").Append(Xdf.TimeFormat.FormatDuration(cvm.StreamDurationSeconds.Value));
             return sb.ToString();
         }
 

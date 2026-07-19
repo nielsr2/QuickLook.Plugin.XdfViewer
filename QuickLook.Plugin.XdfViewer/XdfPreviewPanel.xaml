@@ -117,7 +117,8 @@
                         <ItemsControl.ItemTemplate>
                           <DataTemplate>
                             <TextBlock Opacity="0.85">
-                              <Run Text="{Binding Timestamp, StringFormat={}{0:0.00}s, Mode=OneWay}" Foreground="#888"/>
+                              <Run Text="{Binding TimeLabel, Mode=OneWay}" Foreground="#888"/>
+                              <Run Text="  "/>
                               <Run Text="{Binding Value, Mode=OneWay}"/>
                             </TextBlock>
                           </DataTemplate>

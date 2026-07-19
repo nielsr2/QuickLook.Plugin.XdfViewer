@@ -18,7 +18,9 @@ namespace QuickLook.Plugin.XdfViewer.Xdf.Model
         /// </summary>
         internal XdfChunkIndex ChunkIndex { get; set; }
 
-        /// <summary>Wall-clock span from the earliest first_timestamp to the latest last_timestamp.</summary>
+        /// <summary>Wall-clock span from the earliest first_timestamp to the latest last_timestamp.
+        /// Footerless (e.g. interrupted) recordings have no such timestamps, so fall back to the
+        /// longest per-stream duration (which itself derives from sample count / nominal rate).</summary>
         public double? TotalDuration
         {
             get
@@ -26,8 +28,30 @@ namespace QuickLook.Plugin.XdfViewer.Xdf.Model
                 var withBoth = Streams
                     .Where(s => s.FirstTimestamp.HasValue && s.LastTimestamp.HasValue)
                     .ToList();
-                if (withBoth.Count == 0) return null;
-                return withBoth.Max(s => s.LastTimestamp.Value) - withBoth.Min(s => s.FirstTimestamp.Value);
+                if (withBoth.Count > 0)
+                    return withBoth.Max(s => s.LastTimestamp.Value) - withBoth.Min(s => s.FirstTimestamp.Value);
+
+                double? best = null;
+                foreach (var s in Streams)
+                {
+                    var d = s.Duration;
+                    if (d.HasValue && (!best.HasValue || d.Value > best.Value)) best = d.Value;
+                }
+                return best;
+            }
+        }
+
+        /// <summary>Earliest known stream start (min first_timestamp) — the zero used to show event
+        /// times relative to the recording start. Null when no stream has a first_timestamp.</summary>
+        public double? RecordingStart
+        {
+            get
+            {
+                double? min = null;
+                foreach (var s in Streams)
+                    if (s.FirstTimestamp.HasValue && (!min.HasValue || s.FirstTimestamp.Value < min.Value))
+                        min = s.FirstTimestamp.Value;
+                return min;
             }
         }
     }

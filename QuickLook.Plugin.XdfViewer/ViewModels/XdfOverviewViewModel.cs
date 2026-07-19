@@ -1,6 +1,6 @@
 using System.Collections.ObjectModel;
-using System.Globalization;
 using System.Text;
+using QuickLook.Plugin.XdfViewer.Xdf;
 using QuickLook.Plugin.XdfViewer.Xdf.Model;
 
 namespace QuickLook.Plugin.XdfViewer.ViewModels
@@ -11,20 +11,34 @@ namespace QuickLook.Plugin.XdfViewer.ViewModels
         {
             FileName = fileName;
             IsTruncated = file.IsTruncated;
+
+            // Zero for recording-relative event times: the recording start, or (footerless files)
+            // the earliest marker timestamp across the file.
+            double? recordingStart = file.RecordingStart ?? EarliestMarker(file);
+
             Streams = new ObservableCollection<StreamCardViewModel>();
             foreach (var s in file.Streams)
-                Streams.Add(new StreamCardViewModel(s));
+                Streams.Add(new StreamCardViewModel(s, recordingStart));
 
             var sb = new StringBuilder();
             int n = file.Streams.Count;
             sb.Append(n).Append(n == 1 ? " stream" : " streams");
             if (file.TotalDuration.HasValue)
-                sb.Append(" · ").Append(file.TotalDuration.Value.ToString("0.0", CultureInfo.InvariantCulture)).Append(" s");
+                sb.Append(" · ").Append(TimeFormat.FormatDuration(file.TotalDuration.Value));
             if (!string.IsNullOrEmpty(file.Version))
                 sb.Append(" · XDF v").Append(file.Version);
             if (IsTruncated)
                 sb.Append(" · file appears truncated");
             Summary = sb.ToString();
+        }
+
+        private static double? EarliestMarker(XdfFile file)
+        {
+            double? min = null;
+            foreach (var s in file.Streams)
+                foreach (var m in s.Markers)
+                    if (!min.HasValue || m.Timestamp < min.Value) min = m.Timestamp;
+            return min;
         }
 
         public string FileName { get; }
