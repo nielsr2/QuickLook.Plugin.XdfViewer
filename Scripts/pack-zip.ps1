@@ -8,6 +8,14 @@ $projDir = Resolve-Path (Join-Path $PSScriptRoot "..")
 $plugin  = "QuickLook.Plugin.XdfViewer.qlplugin"
 $target  = Join-Path $projDir $plugin
 
+# Build first so the packaged DLL always reflects current source. The previous script only zipped
+# whatever already sat in bin\$Configuration, which silently shipped a stale DLL (packaged the
+# previous day's Release build while all work had gone into Debug). dotnet failures don't throw,
+# so check $LASTEXITCODE explicitly.
+$csproj = Join-Path $projDir "QuickLook.Plugin.XdfViewer.csproj"
+& dotnet build $csproj -c $Configuration
+if ($LASTEXITCODE -ne 0) { throw "build failed ($Configuration); not packing a stale DLL" }
+
 # QuickLook's installer reads "QuickLook.Plugin.Metadata.config" (NOT the ".Base"
 # template) from the package, and requires /Metadata/Namespace + /Metadata/Version.
 # Generate it from the template and stamp a version (git commit count; "0" fallback).

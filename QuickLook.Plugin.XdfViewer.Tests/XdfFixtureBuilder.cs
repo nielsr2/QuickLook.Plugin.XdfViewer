@@ -84,6 +84,38 @@ namespace QuickLook.Plugin.XdfViewer.Tests
             return this;
         }
 
+        public XdfFixtureBuilder SamplesNumeric(uint id, string format, int channelCount,
+            bool withTimestamps, params double[][] samples)
+        {
+            using (var m = new MemoryStream())
+            using (var w = new BinaryWriter(m))
+            {
+                w.Write(id);
+                WriteVarLen(w, samples.Length);
+                foreach (var sample in samples)
+                {
+                    if (withTimestamps) { w.Write((byte)8); w.Write(0.0); } else w.Write((byte)0);
+                    for (int c = 0; c < channelCount; c++) WriteNumericValue(w, format, sample[c]);
+                }
+                Chunk(3, m.ToArray());
+            }
+            return this;
+        }
+
+        private static void WriteNumericValue(BinaryWriter w, string format, double v)
+        {
+            switch (format)
+            {
+                case "int8":     w.Write((sbyte)v);  break;
+                case "int16":    w.Write((short)v);  break;
+                case "int32":    w.Write((int)v);    break;
+                case "int64":    w.Write((long)v);   break;
+                case "float32":  w.Write((float)v);  break;
+                case "double64": w.Write(v);         break;
+                default: throw new System.ArgumentException($"unsupported format {format}");
+            }
+        }
+
         public XdfFixtureBuilder SamplesString(uint id, params (double ts, string val)[] markers)
         {
             using (var m = new MemoryStream())

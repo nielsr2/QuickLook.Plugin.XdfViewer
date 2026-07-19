@@ -3,6 +3,10 @@
     <TargetFramework>net462</TargetFramework>
     <IsPackable>false</IsPackable>
     <LangVersion>latest</LangVersion>
+    <!-- Needed only so the compiler can resolve FrameworkElement, the base type of
+         WaveformSparkline, when referencing its internal static MapX/MapY helpers.
+         No test constructs the control, a Window, or otherwise touches the GUI. -->
+    <UseWPF>true</UseWPF>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.9.0" />
@@ -10,6 +14,6 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="2.5.7" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\QuickLook.Plugin.XdfViewer\QuickLook.Plugin.XdfViewer.csproj" />
+    <ProjectReference Include="..\QuickLook.Plugin.XdfViewer.csproj" />
   </ItemGroup>
 </Project>

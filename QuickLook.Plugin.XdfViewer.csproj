@@ -27,6 +27,15 @@
     <None Remove="QuickLook.Common\**" />
   </ItemGroup>
 
+  <!-- This project sits at the repo root, so the sibling test project is a subfolder.
+       Keep its sources out of this assembly's default (recursive) globs. -->
+  <ItemGroup>
+    <Compile Remove="QuickLook.Plugin.XdfViewer.Tests\**" />
+    <Page Remove="QuickLook.Plugin.XdfViewer.Tests\**" />
+    <EmbeddedResource Remove="QuickLook.Plugin.XdfViewer.Tests\**" />
+    <None Remove="QuickLook.Plugin.XdfViewer.Tests\**" />
+  </ItemGroup>
+
   <ItemGroup>
     <None Update="QuickLook.Plugin.Metadata.Base.config">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
