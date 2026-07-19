@@ -483,6 +483,15 @@ namespace QuickLook.Plugin.XdfViewer
             PlotCell.Cursor = Cursors.Arrow;
         }
 
+        // Capture can be revoked without a matching MouseUp (window deactivation, Alt-Tab, a dialog
+        // stealing focus mid-drag). Without this, _dragging would stay true and the plot would pan on
+        // plain mouse-move afterwards. Reset the drag state whenever capture is lost by any means.
+        private void PlotCell_LostMouseCapture(object sender, MouseEventArgs e)
+        {
+            _dragging = false;
+            PlotCell.Cursor = Cursors.Arrow;
+        }
+
         private void PlotCell_SizeChanged(object sender, SizeChangedEventArgs e)
         {
             if (_fullChannel == null) return;
@@ -520,6 +529,11 @@ namespace QuickLook.Plugin.XdfViewer
             if (!_miniDragging) return;
             _miniDragging = false;
             Minimap.ReleaseMouseCapture();
+        }
+
+        private void Mini_LostMouseCapture(object sender, MouseEventArgs e)
+        {
+            _miniDragging = false;
         }
 
         private void MiniWave_SizeChanged(object sender, SizeChangedEventArgs e)

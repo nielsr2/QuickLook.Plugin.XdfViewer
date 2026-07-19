@@ -182,6 +182,7 @@
                 MouseLeftButtonDown="PlotCell_MouseLeftButtonDown"
                 MouseMove="PlotCell_MouseMove"
                 MouseLeftButtonUp="PlotCell_MouseLeftButtonUp"
+                LostMouseCapture="PlotCell_LostMouseCapture"
                 SizeChanged="PlotCell_SizeChanged">
             <controls:WaveformSparkline x:Name="FullWave" ShowGrid="True" Filled="True"
                        VerticalInset="12" SampleDotThresholdPx="6"
@@ -199,7 +200,8 @@
                     Cursor="Hand"
                     MouseLeftButtonDown="Mini_MouseLeftButtonDown"
                     MouseMove="Mini_MouseMove"
-                    MouseLeftButtonUp="Mini_MouseLeftButtonUp">
+                    MouseLeftButtonUp="Mini_MouseLeftButtonUp"
+                    LostMouseCapture="Mini_LostMouseCapture">
               <Grid>
                 <controls:WaveformSparkline x:Name="MiniWave" Filled="True" VerticalInset="4"
                            Margin="4,4,4,4" Envelope="{Binding FullDetail}"
