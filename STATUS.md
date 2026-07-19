@@ -5,8 +5,9 @@
 
 ## Where things stand
 
-- Feature-complete QuickLook **XDF viewer** plugin. All recent work is on branch
-  **`feat/channel-waveforms`** — **31 commits ahead of `master`, still unmerged**.
+- Feature-complete QuickLook **XDF viewer** plugin. The `feat/channel-waveforms` work is now
+  **merged into `master`** (merge commit `e7fb93b`); `master` is the working branch and the
+  feature branch has been deleted.
 - **170 tests green**, build clean (0 warnings), plugin csproj keeps **zero `PackageReference`**,
   model/view-models stay WPF-free.
 - Packaged as `QuickLook.Plugin.XdfViewer.qlplugin` via `Scripts/pack-zip.ps1` (which now **builds
@@ -28,7 +29,7 @@
 - **Publish essentials**: GPL-3.0 `LICENSE`, GitHub Actions CI (`.github/workflows/build.yml`),
   README Download/License sections, untracked local dev notes.
 
-## Approved but NOT yet built — resume here next session
+## In progress — full-view polish + markers/search
 
 1. **Full-view polish**: hover **crosshair** with time + amplitude readout; `Esc` to close;
    arrow/`+`/`-`/`Home`/`End` keyboard shortcuts; double-click to reset zoom-out.
@@ -52,7 +53,7 @@
   `AssemblyInfo.cs` version (`0.1.0.0`) vs the git-commit-count package version.
 - ClockOffset-corrected absolute/cross-stream timestamps (likely overkill for a preview).
 
-## Layout: flattened ✔ (2026-07-19, branch `chore/flatten-repo-layout`)
+## Layout: flattened ✔ (2026-07-19, in `master` via merge `e7fb93b`)
 
 The plugin project now lives at the **repo root** — the conventional QuickLook layout (matches the
 `QuickLook.Plugin.HelloWorld` template and `OfficeViewer`). The old doubled
@@ -80,7 +81,4 @@ Renaming the outer working-copy folder is likewise cosmetic and does not change 
 dotnet build QuickLook.Plugin.XdfViewer.csproj -c Release
 dotnet test  QuickLook.Plugin.XdfViewer.Tests -c Debug           # 170 tests
 pwsh Scripts/pack-zip.ps1 -Configuration Release
-
-# merge the feature branch when you're happy
-git checkout master && git merge --no-ff feat/channel-waveforms
 ```
