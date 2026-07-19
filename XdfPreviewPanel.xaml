@@ -180,6 +180,14 @@
                     ValueChanged="GainSlider_ValueChanged"/>
             <TextBlock x:Name="GainLabel" Text="×1" Opacity="0.7" FontSize="11"
                        VerticalAlignment="Center" MinWidth="34"/>
+            <TextBlock x:Name="MarkerModeLabel" Text="Markers" Opacity="0.7" FontSize="11"
+                       VerticalAlignment="Center" Margin="16,0,0,0"/>
+            <ComboBox x:Name="MarkerModeCombo" Width="82" Margin="6,0,0,0" VerticalAlignment="Center"
+                      SelectedIndex="1" SelectionChanged="MarkerModeCombo_SelectionChanged">
+              <ComboBoxItem>Off</ComboBoxItem>
+              <ComboBoxItem>Lines</ComboBoxItem>
+              <ComboBoxItem>Labels</ComboBoxItem>
+            </ComboBox>
             <TextBlock Text="scroll = pan · Shift = zoom · trackpad ↕ zoom" Opacity="0.4"
                        FontSize="11" VerticalAlignment="Center" Margin="16,0,0,0"
                        TextTrimming="CharacterEllipsis"/>
@@ -219,6 +227,9 @@
             <controls:WaveformSparkline x:Name="FullWave" ShowGrid="True" Filled="True"
                        VerticalInset="12" SampleDotThresholdPx="6"
                        LineBrush="{DynamicResource WaveformBrush}"/>
+            <!-- Marker overlay: vertical event lines (+ value labels in Labels mode). Non-hit-testable
+                 so it never intercepts the plot's wheel/drag/move. -->
+            <Canvas x:Name="MarkerLayer" IsHitTestVisible="False"/>
             <!-- Hover crosshair: dashed vertical+horizontal guides + a time/amplitude readout.
                  IsHitTestVisible=False so PlotCell keeps receiving wheel/drag/move. -->
             <Canvas x:Name="CrosshairLayer" IsHitTestVisible="False" Visibility="Collapsed">

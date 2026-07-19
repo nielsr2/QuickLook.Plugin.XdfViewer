@@ -49,6 +49,17 @@ namespace QuickLook.Plugin.XdfViewer.Tests
         }
 
         [Fact]
+        public void StreamFirstTimestamp_ComesFromStream()
+        {
+            // The full-view marker overlay anchors marker times to this stream's own first timestamp.
+            var channel = new XdfChannel { Label = "Fp1" };
+            var stream = new XdfStream { FirstTimestamp = 123.5, LastTimestamp = 130.0 };
+            var vm = new ChannelViewModel(channel, stream);
+
+            Assert.Equal(123.5, vm.StreamFirstTimestamp);
+        }
+
+        [Fact]
         public void HasWaveform_FalseInitially_NoSparkline()
         {
             var channel = new XdfChannel { Label = "Fp1" };

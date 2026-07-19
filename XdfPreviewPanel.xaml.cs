@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -49,6 +50,17 @@ namespace QuickLook.Plugin.XdfViewer
         private const double DotThresholdPx = 6.0;   // must match FullWave.SampleDotThresholdPx
         private const double Inset = 12.0;           // must match FullWave.VerticalInset
         private const int ReadDebounceMs = 110;
+        private const int MaxMarkerLines = 4000;     // safety cap against pathological event counts
+        private const int MaxMarkerLabels = 60;      // beyond this, Labels mode falls back to lines only
+
+        // Marker overlay state: the file's events + the display mode (index matches the ComboBox).
+        private readonly List<XdfMarker> _fullMarkers = new List<XdfMarker>();
+        private int _markerMode = 1;                 // 0 = Off, 1 = Lines, 2 = Labels
+
+        // Amber reads clearly over the waveform on both light and dark themes.
+        private static readonly Brush MarkerBrush = Frozen(Color.FromRgb(0xE0, 0x8E, 0x2A));
+        private static readonly Brush MarkerLabelBg = Frozen(Color.FromArgb(0x99, 0, 0, 0));
+        private static Brush Frozen(Color c) { var b = new SolidColorBrush(c); b.Freeze(); return b; }
 
         public XdfPreviewPanel()
         {
@@ -211,6 +223,16 @@ namespace QuickLook.Plugin.XdfViewer
             _renderedCount = _totalSamples;
             FullWave.Envelope = cvm.FullDetail;
 
+            // Collect the file's events (from every marker stream) for the overlay; hide the mode
+            // selector when there are none.
+            _fullMarkers.Clear();
+            if (_file != null)
+                foreach (var s in _file.Streams)
+                    if (s.IsMarkerStream) _fullMarkers.AddRange(s.Markers);
+            bool hasMarkers = _fullMarkers.Count > 0;
+            MarkerModeLabel.Visibility = MarkerModeCombo.Visibility =
+                hasMarkers ? Visibility.Visible : Visibility.Collapsed;
+
             FullView.Visibility = Visibility.Visible;
             // Grab keyboard focus once the overlay is laid out, so Esc/Home/End work right away.
             Dispatcher.BeginInvoke(new Action(() => FullView.Focus()), DispatcherPriority.Input);
@@ -280,6 +302,8 @@ namespace QuickLook.Plugin.XdfViewer
             _readTimer?.Stop();
             _fullReadSeq++;
             HideCrosshair();
+            _fullMarkers.Clear();
+            if (MarkerLayer != null) MarkerLayer.Children.Clear();
             FullView.Visibility = Visibility.Collapsed;
             FullView.DataContext = null;
             _fullChannel = null;
@@ -351,6 +375,68 @@ namespace QuickLook.Plugin.XdfViewer
 
             UpdateMinimap();
             UpdateBadge();
+            UpdateMarkers();
+        }
+
+        private void MarkerModeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (MarkerModeCombo == null) return;
+            _markerMode = MarkerModeCombo.SelectedIndex;   // 0 = Off, 1 = Lines, 2 = Labels
+            UpdateMarkers();
+        }
+
+        /// <summary>Redraws the marker overlay for the visible window. Each event maps
+        /// <c>Timestamp − stream.FirstTimestamp</c> (seconds) to an x via <see cref="MarkerLayout"/>;
+        /// off-window events are skipped. Suppressed entirely when the stream has no first timestamp
+        /// (its timeline zero is unknown), so events are never mis-placed.</summary>
+        private void UpdateMarkers()
+        {
+            if (MarkerLayer == null) return;
+            MarkerLayer.Children.Clear();
+            if (_markerMode == 0 || _fullChannel == null || _fullMarkers.Count == 0) return;
+
+            double firstTs = _fullChannel.StreamFirstTimestamp ?? double.NaN;
+            if (double.IsNaN(firstTs) || _durationSec <= 0 || _totalSamples <= 0) return;
+
+            double vp = ViewportPx;
+            double h = FullWave != null ? FullWave.ActualHeight : 0;
+            if (vp <= 0 || h <= 0) return;
+
+            double startSec = _durationSec * (_viewStart / _totalSamples);
+            double endSec = _durationSec * ((_viewStart + _viewCount) / _totalSamples);
+            bool labels = _markerMode == 2;
+
+            int lines = 0, labelsDrawn = 0;
+            foreach (var m in _fullMarkers)
+            {
+                double x = MarkerLayout.XForSeconds(m.Timestamp - firstTs, startSec, endSec, vp);
+                if (double.IsNaN(x)) continue;
+                if (++lines > MaxMarkerLines) break;
+
+                MarkerLayer.Children.Add(new Line
+                {
+                    X1 = x, X2 = x, Y1 = 0, Y2 = h,
+                    Stroke = MarkerBrush, StrokeThickness = 1, Opacity = 0.75
+                });
+                MarkerLayer.Children.Add(new Polygon
+                {
+                    Fill = MarkerBrush,
+                    Points = new PointCollection { new Point(x - 3, 0), new Point(x + 3, 0), new Point(x, 5) }
+                });
+
+                if (labels && labelsDrawn < MaxMarkerLabels && !string.IsNullOrEmpty(m.Value))
+                {
+                    var tb = new TextBlock
+                    {
+                        Text = m.Value, FontSize = 9, Foreground = MarkerBrush,
+                        Background = MarkerLabelBg, Padding = new Thickness(2, 0, 2, 0)
+                    };
+                    Canvas.SetLeft(tb, x + 3);
+                    Canvas.SetTop(tb, 5);
+                    MarkerLayer.Children.Add(tb);
+                    labelsDrawn++;
+                }
+            }
         }
 
         private void UpdateBadge()

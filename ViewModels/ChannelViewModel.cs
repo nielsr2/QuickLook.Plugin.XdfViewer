@@ -35,6 +35,10 @@ namespace QuickLook.Plugin.XdfViewer.ViewModels
         /// <summary>Duration of the owning stream, in seconds (for the expanded time axis).</summary>
         public double? StreamDurationSeconds => _stream.Duration;
 
+        /// <summary>First timestamp of the owning stream (the full view's time-zero; anchors the
+        /// marker overlay). Null when the stream has no timestamps.</summary>
+        public double? StreamFirstTimestamp => _stream.FirstTimestamp;
+
         public ChannelEnvelope Sparkline
         {
             get => _sparkline;
