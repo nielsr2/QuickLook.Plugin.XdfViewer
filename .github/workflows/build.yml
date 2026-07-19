@@ -1,0 +1,47 @@
+name: build
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest   # WPF / .NET Framework 4.6.2 needs a Windows runner
+    steps:
+      - name: Checkout (with QuickLook.Common submodule)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build (Release)
+        run: dotnet build QuickLook.Plugin.XdfViewer/QuickLook.Plugin.XdfViewer.csproj -c Release
+
+      - name: Test
+        run: dotnet test QuickLook.Plugin.XdfViewer.Tests -c Debug
+
+      - name: Pack .qlplugin
+        run: powershell -File QuickLook.Plugin.XdfViewer/Scripts/pack-zip.ps1 -Configuration Release
+
+      - name: Upload .qlplugin artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: QuickLook.Plugin.XdfViewer.qlplugin
+          path: QuickLook.Plugin.XdfViewer/QuickLook.Plugin.XdfViewer.qlplugin
+
+      # On a version tag (e.g. v1.0.0) also publish the .qlplugin as a GitHub Release asset,
+      # which is what the QuickLook plugin list links to for downloads.
+      - name: Publish Release (on tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: QuickLook.Plugin.XdfViewer/QuickLook.Plugin.XdfViewer.qlplugin
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

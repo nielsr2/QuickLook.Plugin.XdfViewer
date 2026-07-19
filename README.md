@@ -2,18 +2,27 @@
 
 A [QuickLook](https://github.com/QL-Win/QuickLook) plugin that previews **XDF**
 (Extensible Data Format — LabRecorder / Lab Streaming Layer) recordings: a
-high-level overview of streams, channels, sample counts, durations, and markers —
-without loading the raw sample data.
+high-level overview of streams, channels, sample counts, durations, and markers,
+plus zoomable per-channel waveforms — without loading the raw sample data up front.
 
-## Build
+> Screenshots: _add a couple of screenshots / a short GIF here (overview cards + the
+> full-window zoom view) before publishing._
+
+## Download
+
+Grab the latest `QuickLook.Plugin.XdfViewer.qlplugin` from the
+[**Releases**](../../releases) page, then open it with QuickLook (see [Install](#install)).
+
+## Build from source
 
 ```
-git clone --recursive <this repo>
+git clone --recursive https://github.com/<your-user>/QuickLook.Plugin.XdfViewer.git
 dotnet build QuickLook.Plugin.XdfViewer/QuickLook.Plugin.XdfViewer.csproj -c Release
 pwsh QuickLook.Plugin.XdfViewer/Scripts/pack-zip.ps1 -Configuration Release
 ```
 
-Produces `QuickLook.Plugin.XdfViewer.qlplugin`.
+`--recursive` is required (the `QuickLook.Common` submodule). Produces
+`QuickLook.Plugin.XdfViewer.qlplugin`.
 
 ## Channel waveforms
 
@@ -93,3 +102,9 @@ restart QuickLook.
 ```
 dotnet test QuickLook.Plugin.XdfViewer.Tests -c Debug
 ```
+
+## License
+
+Licensed under the **GNU General Public License v3.0** — see [LICENSE](LICENSE). This
+matches [QuickLook](https://github.com/QL-Win/QuickLook) itself (GPL-3.0), whose
+`QuickLook.Common` library this plugin builds against.
