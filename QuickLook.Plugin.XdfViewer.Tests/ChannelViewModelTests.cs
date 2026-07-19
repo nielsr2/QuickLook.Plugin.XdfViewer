@@ -173,6 +173,35 @@ namespace QuickLook.Plugin.XdfViewer.Tests
         }
 
         [Fact]
+        public void IsFilteredOut_SetTrue_RaisesPropertyChanged()
+        {
+            var vm = new ChannelViewModel(new XdfChannel { Label = "Fp1" }, new XdfStream());
+            var raised = CapturePropertyChanges(vm);
+
+            Assert.False(vm.IsFilteredOut);
+            vm.IsFilteredOut = true;
+
+            Assert.True(vm.IsFilteredOut);
+            Assert.Contains(nameof(ChannelViewModel.IsFilteredOut), raised);
+        }
+
+        [Fact]
+        public void StreamCard_NoChannelMatch_DefaultsFalse_RaisesOnSet()
+        {
+            var stream = new XdfStream { ChannelFormat = "float32" };
+            stream.Channels.Add(new XdfChannel { Label = "Fp1" });
+            var card = new StreamCardViewModel(stream);
+            var raised = new List<string>();
+            card.PropertyChanged += (s, e) => raised.Add(e.PropertyName);
+
+            Assert.False(card.NoChannelMatch);
+            card.SetNoChannelMatch(true);
+
+            Assert.True(card.NoChannelMatch);
+            Assert.Contains(nameof(StreamCardViewModel.NoChannelMatch), raised);
+        }
+
+        [Fact]
         public void SetDetail_SetsDetail_RaisesPropertyChanged()
         {
             var channel = new XdfChannel { Label = "Fp1" };

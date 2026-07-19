@@ -14,6 +14,12 @@
         <TextBlock x:Name="FileNameText" FontSize="18" FontWeight="SemiBold"
                    TextTrimming="CharacterEllipsis"/>
         <TextBlock x:Name="SummaryText" Opacity="0.7" Margin="0,2,0,0"/>
+        <!-- Channel search: filters channel rows by label across all stream cards. -->
+        <Grid x:Name="ChannelSearchGrid" Margin="0,8,0,0" MaxWidth="360" HorizontalAlignment="Left">
+          <TextBox x:Name="ChannelSearchBox" Padding="6,3" TextChanged="ChannelSearchBox_TextChanged"/>
+          <TextBlock x:Name="ChannelSearchPlaceholder" Text="Filter channels by name…"
+                     Margin="9,0,0,0" VerticalAlignment="Center" Opacity="0.45" IsHitTestVisible="False"/>
+        </Grid>
       </StackPanel>
       <ScrollViewer VerticalScrollBarVisibility="Auto">
         <ItemsControl x:Name="StreamsList">
@@ -57,7 +63,8 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                           <DataTemplate>
-                            <StackPanel Margin="0,1">
+                            <StackPanel Margin="0,1"
+                                        Visibility="{Binding IsFilteredOut, Converter={StaticResource InverseBoolToVis}}">
                               <Border Background="Transparent" Cursor="Hand"
                                       MouseLeftButtonUp="ChannelRow_MouseLeftButtonUp">
                                 <DockPanel>
@@ -124,6 +131,10 @@
                           </DataTemplate>
                         </ItemsControl.ItemTemplate>
                       </ItemsControl>
+                      <!-- Shown when a search filters out every channel of this (numeric) stream -->
+                      <TextBlock Text="no matching channels" Opacity="0.5" FontSize="11"
+                                 Margin="2,4,0,0" VerticalAlignment="Top"
+                                 Visibility="{Binding NoChannelMatch, Converter={StaticResource BoolToVis}}"/>
                     </Grid>
                   </Expander>
                 </StackPanel>

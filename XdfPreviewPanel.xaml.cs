@@ -128,7 +128,45 @@ namespace QuickLook.Plugin.XdfViewer
             FileNameText.Text = vm.FileName;
             SummaryText.Text = vm.Summary;
             StreamsList.ItemsSource = vm.Streams;
+
+            // Reset the channel-search box and hide it when there are no numeric channels to filter.
+            ChannelSearchBox.Text = "";   // clears any prior filter via TextChanged
+            bool anyChannels = false;
+            foreach (var s in vm.Streams)
+                if (!s.IsMarkerStream && s.Channels.Count > 0) { anyChannels = true; break; }
+            ChannelSearchGrid.Visibility = anyChannels ? Visibility.Visible : Visibility.Collapsed;
+
             Root.Visibility = Visibility.Visible;
+        }
+
+        private void ChannelSearchBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            string query = ChannelSearchBox.Text;
+            if (ChannelSearchPlaceholder != null)
+                ChannelSearchPlaceholder.Visibility =
+                    string.IsNullOrEmpty(query) ? Visibility.Visible : Visibility.Collapsed;
+            ApplyChannelSearch(query);
+        }
+
+        /// <summary>Filters channel rows across every numeric stream by label (case-insensitive
+        /// substring via <see cref="ViewModels.ChannelSearch"/>), flagging cards whose channels are
+        /// all filtered out. Marker streams are unaffected.</summary>
+        private void ApplyChannelSearch(string query)
+        {
+            if (_vm == null) return;
+            foreach (var stream in _vm.Streams)
+            {
+                if (stream.IsMarkerStream) continue;
+                int visible = 0;
+                foreach (var ch in stream.Channels)
+                {
+                    bool match = ViewModels.ChannelSearch.Matches(ch.Label, query);
+                    ch.IsFilteredOut = !match;
+                    if (match) visible++;
+                }
+                stream.SetNoChannelMatch(
+                    stream.Channels.Count > 0 && visible == 0 && !string.IsNullOrWhiteSpace(query));
+            }
         }
 
         public void ShowError(string message)
