@@ -67,6 +67,12 @@
                                     Envelope="{Binding Sparkline}"
                                     LineBrush="{DynamicResource WaveformBrush}"
                                     Visibility="{Binding HasWaveform, Converter={StaticResource BoolToVis}}"/>
+                                  <!-- Flat-channel warning: sits just left of the sparkline -->
+                                  <TextBlock DockPanel.Dock="Right" Text="&#x26A0;&#xFE0E;"
+                                    FontFamily="Segoe UI Symbol" FontSize="12" Foreground="#9A9A9A"
+                                    VerticalAlignment="Center" Margin="8,0,0,0"
+                                    ToolTip="Flat channel — a constant value throughout the previewed data (often a disconnected or unused sensor)."
+                                    Visibility="{Binding IsFlat, Converter={StaticResource BoolToVis}}"/>
                                   <TextBlock Opacity="0.85" VerticalAlignment="Center" TextTrimming="CharacterEllipsis">
                                     <Run Text="{Binding Label, Mode=OneWay}"/>
                                     <Run Text="{Binding Unit, Mode=OneWay}" FontStyle="Italic" Foreground="#888"/>

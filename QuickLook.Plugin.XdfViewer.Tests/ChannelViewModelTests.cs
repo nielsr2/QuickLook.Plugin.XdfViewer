@@ -89,6 +89,63 @@ namespace QuickLook.Plugin.XdfViewer.Tests
             Assert.False(vm.HasWaveform);
         }
 
+        private static ChannelEnvelope MakeFlatEnvelope() => new ChannelEnvelope
+        {
+            Min = new[] { 0f, 0f },
+            Max = new[] { 0f, 0f },
+            Filled = new[] { true, true },
+            BucketCount = 2,
+            DataMin = 0f,
+            DataMax = 0f,
+            IsApproximate = false,
+            IsEmpty = false
+        };
+
+        [Fact]
+        public void IsFlat_FalseWhenNoSparkline()
+        {
+            var vm = new ChannelViewModel(new XdfChannel { Label = "x" }, new XdfStream());
+            Assert.False(vm.IsFlat);
+        }
+
+        [Fact]
+        public void IsFlat_TrueForConstantChannel_RaisesPropertyChanged()
+        {
+            var channel = new XdfChannel { Label = "accX" };
+            var vm = new ChannelViewModel(channel, new XdfStream());
+            var raised = CapturePropertyChanges(vm);
+
+            channel.Envelope = MakeFlatEnvelope();
+            vm.RefreshEnvelope();
+
+            Assert.True(vm.IsFlat);
+            Assert.Contains(nameof(ChannelViewModel.IsFlat), raised);
+        }
+
+        [Fact]
+        public void IsFlat_FalseForVaryingChannel()
+        {
+            var channel = new XdfChannel { Label = "accX" };
+            var vm = new ChannelViewModel(channel, new XdfStream());
+
+            channel.Envelope = MakeEnvelope(empty: false); // DataMin 0, DataMax 3
+            vm.RefreshEnvelope();
+
+            Assert.False(vm.IsFlat);
+        }
+
+        [Fact]
+        public void IsFlat_FalseForEmptyChannel()
+        {
+            var channel = new XdfChannel { Label = "accX" };
+            var vm = new ChannelViewModel(channel, new XdfStream());
+
+            channel.Envelope = MakeEnvelope(empty: true);
+            vm.RefreshEnvelope();
+
+            Assert.False(vm.IsFlat);
+        }
+
         [Fact]
         public void IsExpanded_SetTrue_RaisesPropertyChanged()
         {

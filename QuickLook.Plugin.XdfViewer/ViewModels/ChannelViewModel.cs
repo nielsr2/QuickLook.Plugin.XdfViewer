@@ -43,6 +43,7 @@ namespace QuickLook.Plugin.XdfViewer.ViewModels
                 _sparkline = value;
                 Raise(nameof(Sparkline));
                 Raise(nameof(HasWaveform));
+                Raise(nameof(IsFlat));
             }
         }
 
@@ -68,6 +69,13 @@ namespace QuickLook.Plugin.XdfViewer.ViewModels
         }
 
         public bool HasWaveform => Sparkline != null && !Sparkline.IsEmpty;
+
+        /// <summary>
+        /// True when the channel carries data but never changes (constant value throughout the
+        /// previewed samples, e.g. all zeros) — usually a disconnected or unused sensor. Drives the
+        /// grey warning marker in the channel row.
+        /// </summary>
+        public bool IsFlat => Sparkline != null && !Sparkline.IsEmpty && Sparkline.DataMax <= Sparkline.DataMin;
 
         public bool IsExpanded
         {
