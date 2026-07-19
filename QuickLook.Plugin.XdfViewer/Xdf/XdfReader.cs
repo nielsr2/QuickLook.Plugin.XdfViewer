@@ -180,6 +180,11 @@ namespace QuickLook.Plugin.XdfViewer.Xdf
         private static StreamEnvelope DecodeStreamEnvelope(BinaryReader reader, Stream stream, XdfStream s,
             List<EnvelopeChunkRef> chunks, long total, Func<BinaryReader, double> read, EnvelopeOptions opts)
         {
+            // A windowed request (full-view zoom) decodes only the chunks overlapping the visible
+            // sample range; the whole-stream path (sparklines/detail) is left byte-for-byte as-is.
+            if (opts.StartSample.HasValue || opts.WindowSampleCount.HasValue)
+                return DecodeWindow(reader, stream, s, chunks, total, read, opts);
+
             long cap = opts.MaxSamplesPerStream > 0 ? opts.MaxSamplesPerStream : 1;
             int k = total <= cap ? 1 : (int)Math.Ceiling((double)total / cap);
             bool approximate = k > 1;
@@ -209,6 +214,73 @@ namespace QuickLook.Plugin.XdfViewer.Xdf
                     }
                 }
                 cumBefore += chunk.NumSamples;
+            }
+
+            return new StreamEnvelope
+            {
+                StreamId = s.Id,
+                Channels = dec.Build(approximate),
+                IsApproximate = approximate
+            };
+        }
+
+        /// <summary>
+        /// Decodes only the sample window [<paramref name="opts"/>.StartSample, +WindowSampleCount)
+        /// of a stream. Selects the chunks overlapping the window; within a straddling chunk it
+        /// decodes sequentially from the chunk start (per-sample byte size varies, so mid-chunk
+        /// seeking is unsafe), reading-and-discarding samples before the window and stopping once
+        /// past it. Buckets span the window, so at &lt;=1 sample/bucket Min==Max is per-sample exact.
+        /// </summary>
+        private static StreamEnvelope DecodeWindow(BinaryReader reader, Stream stream, XdfStream s,
+            List<EnvelopeChunkRef> chunks, long total, Func<BinaryReader, double> read, EnvelopeOptions opts)
+        {
+            int channelCount = s.ChannelCount;
+
+            long winStart = Math.Max(0, Math.Min(opts.StartSample ?? 0, total));
+            long avail = total - winStart;
+            long winCount = opts.WindowSampleCount ?? avail;
+            if (winCount < 0) winCount = 0;
+            if (winCount > avail) winCount = avail;
+            long winEnd = winStart + winCount;
+
+            long cap = opts.MaxSamplesPerStream > 0 ? opts.MaxSamplesPerStream : 1;
+            long k = winCount <= cap ? 1 : (long)Math.Ceiling((double)winCount / cap);
+            bool approximate = k > 1;
+
+            var dec = new EnvelopeDecimator(channelCount, opts.Buckets);
+
+            long cumBefore = 0;
+            for (int ci = 0; ci < chunks.Count && cumBefore < winEnd; ci++)
+            {
+                var chunk = chunks[ci];
+                long chunkStart = cumBefore;
+                long chunkEnd = cumBefore + chunk.NumSamples;    // exclusive
+                cumBefore = chunkEnd;
+
+                if (chunkEnd <= winStart) continue;              // entirely before the window
+                if (chunkStart >= winEnd) break;                 // entirely after (chunks are ordered)
+
+                stream.Seek(chunk.ValuesStart, SeekOrigin.Begin);
+                for (long i = 0; i < chunk.NumSamples && stream.Position < chunk.ContentEnd; i++)
+                {
+                    long g = chunkStart + i;
+                    if (g >= winEnd) break;                      // past the window: stop this chunk
+
+                    byte tsMarker = reader.ReadByte();
+                    if (tsMarker == 8) reader.ReadDouble();
+
+                    bool inWindow = g >= winStart;
+                    long local = g - winStart;
+                    // Keep the window's first & last samples so the ends are always represented.
+                    bool take = inWindow && (k == 1 || local % k == 0 || g == winStart || g == winEnd - 1);
+                    int bucket = inWindow ? EnvelopeDecimator.BucketOf(local, winCount, opts.Buckets) : 0;
+
+                    for (int c = 0; c < channelCount; c++)
+                    {
+                        double v = read(reader);                 // always read to advance the stream
+                        if (take) dec.Add(c, bucket, v);
+                    }
+                }
             }
 
             return new StreamEnvelope
