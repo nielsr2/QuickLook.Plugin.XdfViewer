@@ -52,6 +52,18 @@ namespace QuickLook.Plugin.XdfViewer
         private const int ReadDebounceMs = 110;
         private const int MaxMarkerLines = 4000;     // safety cap against pathological event counts
         private const int MaxMarkerLabels = 60;      // beyond this, Labels mode falls back to lines only
+        private const double MinCardWidth = 320.0;   // narrowest a stream card should get before dropping a column
+
+        /// <summary>Column count for the stream-card grid, recomputed from the available width so the
+        /// cards stretch to fill the preview window. Bound by the ItemsPanel's UniformGrid.</summary>
+        public static readonly DependencyProperty CardColumnsProperty = DependencyProperty.Register(
+            nameof(CardColumns), typeof(int), typeof(XdfPreviewPanel), new PropertyMetadata(1));
+
+        public int CardColumns
+        {
+            get => (int)GetValue(CardColumnsProperty);
+            set => SetValue(CardColumnsProperty, value);
+        }
 
         // Marker overlay state: the file's events + the display mode (index matches the ComboBox).
         private readonly List<XdfMarker> _fullMarkers = new List<XdfMarker>();
@@ -136,7 +148,19 @@ namespace QuickLook.Plugin.XdfViewer
                 if (!s.IsMarkerStream && s.Channels.Count > 0) { anyChannels = true; break; }
             ChannelSearchGrid.Visibility = anyChannels ? Visibility.Visible : Visibility.Collapsed;
 
+            UpdateCardColumns();
             Root.Visibility = Visibility.Visible;
+        }
+
+        private void StreamsList_SizeChanged(object sender, SizeChangedEventArgs e) => UpdateCardColumns();
+
+        /// <summary>Re-fits the card grid to the current width: as many equal columns as fit at
+        /// <see cref="MinCardWidth"/>, never more than there are streams.</summary>
+        private void UpdateCardColumns()
+        {
+            if (StreamsList == null) return;
+            int count = _vm?.Streams?.Count ?? 0;
+            CardColumns = CardLayout.ColumnsForWidth(StreamsList.ActualWidth, MinCardWidth, count);
         }
 
         private void ChannelSearchBox_TextChanged(object sender, TextChangedEventArgs e)
