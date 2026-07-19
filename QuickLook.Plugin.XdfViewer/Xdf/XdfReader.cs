@@ -18,6 +18,10 @@ namespace QuickLook.Plugin.XdfViewer.Xdf
         public const long MaxEnvelopeSamplesPerStreamHiRes = 200_000;
         public const long MaxEnvelopeSamplesPerStreamFull = 5_000_000;
         public const int MaxFullBuckets = 8_000;
+        /// <summary>Upper bound on a stream's channel count for envelope building. Real devices are far
+        /// below this (Trigno 144, HD-EEG ~256); a larger value is treated as a corrupt header and the
+        /// stream gets no waveform (its metadata still shows), avoiding a huge/OOM allocation.</summary>
+        public const int MaxEnvelopeChannels = 4_096;
         private static readonly byte[] Magic = { 0x58, 0x44, 0x46, 0x3A }; // "XDF:"
 
         public static XdfFile Read(string path)
@@ -168,7 +172,7 @@ namespace QuickLook.Plugin.XdfViewer.Xdf
             foreach (var s in file.Streams)
             {
                 if (opts.OnlyStreamId.HasValue && s.Id != opts.OnlyStreamId.Value) continue;
-                if (s.ChannelCount <= 0) continue;
+                if (s.ChannelCount <= 0 || s.ChannelCount > MaxEnvelopeChannels) continue;
                 if (!XdfSampleFormat.TryGetNumeric(s.ChannelFormat, out _, out var read)) continue;
                 if (!chunksByStream.TryGetValue(s.Id, out var chunks) || chunks.Count == 0) continue;
 
@@ -217,11 +221,13 @@ namespace QuickLook.Plugin.XdfViewer.Xdf
                         byte tsMarker = reader.ReadByte();
                         if (tsMarker == 8) reader.ReadDouble();
 
+                        long g = cumBefore + i;
+                        int bkt = EnvelopeDecimator.BucketOf(g, total, opts.Buckets);
                         for (int c = 0; c < channelCount; c++)
                         {
+                            if (stream.Position >= chunk.ContentEnd) break; // don't bleed into the next chunk
                             double v = read(reader);
-                            long g = cumBefore + i;
-                            dec.Add(c, EnvelopeDecimator.BucketOf(g, total, opts.Buckets), v);
+                            dec.Add(c, bkt, v);
                         }
                     }
                 }
@@ -289,6 +295,7 @@ namespace QuickLook.Plugin.XdfViewer.Xdf
 
                     for (int c = 0; c < channelCount; c++)
                     {
+                        if (stream.Position >= chunk.ContentEnd) break; // don't bleed into the next chunk
                         double v = read(reader);                 // always read to advance the stream
                         if (take) dec.Add(c, bucket, v);
                     }
@@ -389,6 +396,7 @@ namespace QuickLook.Plugin.XdfViewer.Xdf
                 int channelCount = s.ChannelCount > 0 ? s.ChannelCount : 1;
                 for (int c = 0; c < channelCount; c++)
                 {
+                    if (stream.Position >= contentEnd) break; // don't bleed into the next chunk
                     long slen = reader.ReadVarLength();
                     var strBytes = reader.ReadBytes((int)slen);
                     var str = Encoding.UTF8.GetString(strBytes);
