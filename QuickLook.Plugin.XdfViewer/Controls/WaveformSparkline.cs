@@ -36,6 +36,14 @@ namespace QuickLook.Plugin.XdfViewer.Controls
             nameof(Filled), typeof(bool), typeof(WaveformSparkline),
             new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.AffectsRender, OnGeometryInputChanged));
 
+        public static readonly DependencyProperty VerticalInsetProperty = DependencyProperty.Register(
+            nameof(VerticalInset), typeof(double), typeof(WaveformSparkline),
+            new FrameworkPropertyMetadata(0.0, FrameworkPropertyMetadataOptions.AffectsRender, OnGeometryInputChanged));
+
+        public static readonly DependencyProperty SampleDotThresholdPxProperty = DependencyProperty.Register(
+            nameof(SampleDotThresholdPx), typeof(double), typeof(WaveformSparkline),
+            new FrameworkPropertyMetadata(0.0, FrameworkPropertyMetadataOptions.AffectsRender, OnGeometryInputChanged));
+
         private static readonly Brush DefaultLineBrush = Brushes.SteelBlue;
 
         private StreamGeometry _cachedGeometry;
@@ -44,6 +52,8 @@ namespace QuickLook.Plugin.XdfViewer.Controls
         private double _geometryHeight = double.NaN;
         private double _geometryGain = double.NaN;
         private bool _geometryFilled;
+        private double _geometryInset = double.NaN;
+        private bool _geometryDots;
 
         public ChannelEnvelope Envelope { get => (ChannelEnvelope)GetValue(EnvelopeProperty); set => SetValue(EnvelopeProperty, value); }
         public Brush LineBrush { get => (Brush)GetValue(LineBrushProperty); set => SetValue(LineBrushProperty, value); }
@@ -56,6 +66,14 @@ namespace QuickLook.Plugin.XdfViewer.Controls
 
         /// <summary>When true, draws a filled min/max band (baseline-pivoted) instead of vertical lines.</summary>
         public bool Filled { get => (bool)GetValue(FilledProperty); set => SetValue(FilledProperty, value); }
+
+        /// <summary>Top &amp; bottom padding (px) reserved inside the element in filled mode; the waveform,
+        /// gridlines and baseline all sit inside [inset, height-inset]. Filled mode only.</summary>
+        public double VerticalInset { get => (double)GetValue(VerticalInsetProperty); set => SetValue(VerticalInsetProperty, value); }
+
+        /// <summary>When &gt; 0 and the zoom reaches at least this many px per bucket (≈1 sample/bucket),
+        /// the filled band switches to discrete sample dots + a thin connector. 0 disables it.</summary>
+        public double SampleDotThresholdPx { get => (double)GetValue(SampleDotThresholdPxProperty); set => SetValue(SampleDotThresholdPxProperty, value); }
 
         private static void OnGeometryInputChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
@@ -91,15 +109,19 @@ namespace QuickLook.Plugin.XdfViewer.Controls
             double height = ActualHeight;
             if (width <= 0 || height <= 0) return;
 
+            bool filled = Filled;
+            double inset = filled ? Clamp0(VerticalInset, height) : 0;
+
             if (ShowGrid)
             {
                 var gridBrush = new SolidColorBrush(Color.FromArgb(0x28, 0x88, 0x88, 0x88));
                 gridBrush.Freeze();
                 var gridPen = new Pen(gridBrush, 1);
                 gridPen.Freeze();
+                double top = inset, usable = height - 2 * inset;
                 for (int k = 0; k <= 4; k++)
                 {
-                    double y = height * k / 4.0;
+                    double y = top + usable * k / 4.0;
                     dc.DrawLine(gridPen, new Point(0, y), new Point(width, y));
                 }
             }
@@ -107,21 +129,60 @@ namespace QuickLook.Plugin.XdfViewer.Controls
             var envelope = Envelope;
             if (envelope == null || envelope.IsEmpty) return;
 
-            bool filled = Filled;
-            var geometry = GetOrBuildGeometry(envelope, width, height, Gain, filled);
+            var lineBrush = LineBrush ?? DefaultLineBrush;
+            bool dots = filled && UseSampleDots(envelope.BucketCount, width, SampleDotThresholdPx);
+
+            var geometry = GetOrBuildGeometry(envelope, width, height, Gain, filled, inset, dots);
             if (geometry == null) return;
 
-            var lineBrush = LineBrush ?? DefaultLineBrush;
-            var pen = new Pen(lineBrush, 1);
-            pen.Freeze();
-
-            if (filled)
+            if (dots)
             {
+                // Thin connector through the samples + a dot on each — the visible "sample-accurate" cue.
+                var thin = new Pen(lineBrush, 1);
+                thin.Freeze();
+                dc.DrawGeometry(null, thin, geometry);
+                DrawSampleDots(dc, envelope, width, height, Gain, inset, lineBrush);
+            }
+            else if (filled)
+            {
+                var pen = new Pen(lineBrush, 1);
+                pen.Freeze();
                 dc.DrawGeometry(MakeFillBrush(lineBrush), pen, geometry);
             }
             else
             {
+                var pen = new Pen(lineBrush, 1);
+                pen.Freeze();
                 dc.DrawGeometry(null, pen, geometry);
+            }
+        }
+
+        private static double Clamp0(double inset, double height)
+        {
+            if (inset < 0 || double.IsNaN(inset)) return 0;
+            double maxInset = height / 2 - 1;   // keep a usable band
+            if (maxInset < 0) maxInset = 0;
+            return inset > maxInset ? maxInset : inset;
+        }
+
+        /// <summary>Draws a filled dot at each filled bucket's mid-value (sample-accurate zoom).</summary>
+        private static void DrawSampleDots(DrawingContext dc, ChannelEnvelope envelope,
+            double width, double height, double gain, double inset, Brush brush)
+        {
+            int bucketCount = envelope.BucketCount;
+            double center = envelope.Center;
+            double halfRange = Math.Max(envelope.DataMax - center, center - envelope.DataMin);
+            if (halfRange <= 0) halfRange = (envelope.DataMax - envelope.DataMin) / 2.0;
+            double pxPerBucket = bucketCount <= 1 ? width : width / (bucketCount - 1);
+            double r = Math.Min(3.5, Math.Max(1.5, pxPerBucket / 4.0));
+
+            for (int b = 0; b < bucketCount; b++)
+            {
+                if (envelope.Filled == null || b >= envelope.Filled.Length || !envelope.Filled[b]) continue;
+                double x = MapX(b, bucketCount, width);
+                double mid = (envelope.Min[b] + envelope.Max[b]) * 0.5;
+                double y = MapYInset(mid, center, halfRange, height, gain, inset);
+                dc.DrawEllipse(brush, null, new Point(x, y), r, r);
             }
         }
 
@@ -133,21 +194,25 @@ namespace QuickLook.Plugin.XdfViewer.Controls
             return fill;
         }
 
-        private StreamGeometry GetOrBuildGeometry(ChannelEnvelope envelope, double width, double height, double gain, bool filled)
+        private StreamGeometry GetOrBuildGeometry(ChannelEnvelope envelope, double width, double height,
+            double gain, bool filled, double inset, bool dots)
         {
             if (_cachedGeometry != null
                 && ReferenceEquals(_geometryEnvelope, envelope)
                 && _geometryWidth == width
                 && _geometryHeight == height
                 && _geometryGain == gain
-                && _geometryFilled == filled)
+                && _geometryFilled == filled
+                && _geometryInset == inset
+                && _geometryDots == dots)
             {
                 return _cachedGeometry;
             }
 
-            var built = filled
-                ? BuildFilledGeometry(envelope, width, height, gain)
-                : BuildLineGeometry(envelope, width, height);
+            StreamGeometry built;
+            if (dots) built = BuildDotConnector(envelope, width, height, gain, inset);
+            else if (filled) built = BuildFilledGeometry(envelope, width, height, gain, inset);
+            else built = BuildLineGeometry(envelope, width, height);
 
             _cachedGeometry = built;
             _geometryEnvelope = envelope;
@@ -155,6 +220,8 @@ namespace QuickLook.Plugin.XdfViewer.Controls
             _geometryHeight = height;
             _geometryGain = gain;
             _geometryFilled = filled;
+            _geometryInset = inset;
+            _geometryDots = dots;
             return built;
         }
 
@@ -193,7 +260,7 @@ namespace QuickLook.Plugin.XdfViewer.Controls
         }
 
         // --- Filled mode: a band between min & max, pivoted about the baseline Center, gain-zoomed. ---
-        private static StreamGeometry BuildFilledGeometry(ChannelEnvelope envelope, double width, double height, double gain)
+        private static StreamGeometry BuildFilledGeometry(ChannelEnvelope envelope, double width, double height, double gain, double inset)
         {
             var geometry = new StreamGeometry();
             int bucketCount = envelope.BucketCount;
@@ -221,19 +288,66 @@ namespace QuickLook.Plugin.XdfViewer.Controls
 
                         // Closed, filled figure: top edge (max) left->right, bottom edge (min) right->left.
                         ctx.BeginFigure(new Point(MapX(start, bucketCount, width),
-                            MapYPivot(envelope.Max[start], center, halfRange, height, gain)), true, true);
+                            MapYInset(envelope.Max[start], center, halfRange, height, gain, inset)), true, true);
                         for (int i = start + 1; i <= end; i++)
                             ctx.LineTo(new Point(MapX(i, bucketCount, width),
-                                MapYPivot(envelope.Max[i], center, halfRange, height, gain)), true, false);
+                                MapYInset(envelope.Max[i], center, halfRange, height, gain, inset)), true, false);
                         for (int i = end; i >= start; i--)
                             ctx.LineTo(new Point(MapX(i, bucketCount, width),
-                                MapYPivot(envelope.Min[i], center, halfRange, height, gain)), true, false);
+                                MapYInset(envelope.Min[i], center, halfRange, height, gain, inset)), true, false);
                     }
                 }
             }
 
             geometry.Freeze();
             return geometry;
+        }
+
+        // --- Sample-dot mode: a thin connector through each filled bucket's mid-value (dots drawn separately). ---
+        private static StreamGeometry BuildDotConnector(ChannelEnvelope envelope, double width, double height, double gain, double inset)
+        {
+            var geometry = new StreamGeometry();
+            int bucketCount = envelope.BucketCount;
+            double center = envelope.Center;
+            double halfRange = Math.Max(envelope.DataMax - center, center - envelope.DataMin);
+            if (halfRange <= 0) halfRange = (envelope.DataMax - envelope.DataMin) / 2.0;
+
+            using (var ctx = geometry.Open())
+            {
+                bool started = false;
+                for (int b = 0; b < bucketCount; b++)
+                {
+                    if (envelope.Filled == null || b >= envelope.Filled.Length || !envelope.Filled[b]) continue;
+                    double x = MapX(b, bucketCount, width);
+                    double mid = (envelope.Min[b] + envelope.Max[b]) * 0.5;
+                    double y = MapYInset(mid, center, halfRange, height, gain, inset);
+                    if (!started) { ctx.BeginFigure(new Point(x, y), false, false); started = true; }
+                    else ctx.LineTo(new Point(x, y), true, false);
+                }
+            }
+
+            geometry.Freeze();
+            return geometry;
+        }
+
+        /// <summary>True once the horizontal zoom reaches ~1 sample/bucket wide enough to show discrete
+        /// samples: pixels-per-bucket ≥ <paramref name="thresholdPx"/> (which must be &gt; 0). Pure/WPF-free.</summary>
+        internal static bool UseSampleDots(int bucketCount, double width, double thresholdPx)
+        {
+            if (thresholdPx <= 0 || bucketCount <= 0 || width <= 0) return false;
+            double pxPerBucket = bucketCount <= 1 ? width : width / (bucketCount - 1);
+            return pxPerBucket >= thresholdPx;
+        }
+
+        /// <summary>
+        /// <see cref="MapYPivot"/> confined to a band inset by <paramref name="inset"/> px top and bottom:
+        /// values map into [inset, height-inset] instead of [0, height]. Pure/WPF-free.
+        /// </summary>
+        internal static double MapYInset(double value, double center, double halfRange, double height, double gain, double inset)
+        {
+            double usable = height - 2 * inset;
+            if (usable <= 0) { usable = height; inset = 0; }
+            return inset + MapYPivot(value, center, halfRange, usable, gain);
         }
 
         /// <summary>Maps a bucket index to a horizontal pixel position across [0, width]. Pure/WPF-free.</summary>

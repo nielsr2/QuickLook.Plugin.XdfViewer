@@ -112,5 +112,67 @@ namespace QuickLook.Plugin.XdfViewer.Tests
         {
             Assert.Equal(50d, WaveformSparkline.MapYGain(5d, 5d, 5d, 100d, 3d));
         }
+
+        // --- Vertical inset (full-view top/bottom padding) ---
+
+        [Fact]
+        public void MapYInset_MaxValue_SitsAtTopInset()
+        {
+            // center 5, halfRange 5, height 100, inset 10 => usable band [10, 90].
+            Assert.Equal(10d, WaveformSparkline.MapYInset(10d, 5d, 5d, 100d, 1d, 10d), 9);
+        }
+
+        [Fact]
+        public void MapYInset_MinValue_SitsAtBottomInset()
+        {
+            Assert.Equal(90d, WaveformSparkline.MapYInset(0d, 5d, 5d, 100d, 1d, 10d), 9);
+        }
+
+        [Fact]
+        public void MapYInset_Center_IsMidHeight()
+        {
+            Assert.Equal(50d, WaveformSparkline.MapYInset(5d, 5d, 5d, 100d, 1d, 10d), 9);
+        }
+
+        [Fact]
+        public void MapYInset_ZeroInset_MatchesMapYPivot()
+        {
+            Assert.Equal(WaveformSparkline.MapYGain(3d, 0d, 10d, 100d, 1d),
+                         WaveformSparkline.MapYInset(3d, 5d, 5d, 100d, 1d, 0d), 9);
+        }
+
+        // --- Sample-dot mode decision (zoomed to ~>=1 sample/bucket) ---
+
+        [Fact]
+        public void UseSampleDots_ThresholdZero_Disabled()
+        {
+            Assert.False(WaveformSparkline.UseSampleDots(50, 1000d, 0d));
+        }
+
+        [Fact]
+        public void UseSampleDots_WidePerBucket_Enabled()
+        {
+            // 100 buckets across 1000px => ~10px/bucket >= 6 threshold.
+            Assert.True(WaveformSparkline.UseSampleDots(100, 1000d, 6d));
+        }
+
+        [Fact]
+        public void UseSampleDots_NarrowPerBucket_Disabled()
+        {
+            // 1000 buckets across 1000px => ~1px/bucket < 6 threshold.
+            Assert.False(WaveformSparkline.UseSampleDots(1000, 1000d, 6d));
+        }
+
+        [Fact]
+        public void UseSampleDots_SingleBucket_UsesFullWidth()
+        {
+            Assert.True(WaveformSparkline.UseSampleDots(1, 1000d, 6d));
+        }
+
+        [Fact]
+        public void UseSampleDots_NoBuckets_Disabled()
+        {
+            Assert.False(WaveformSparkline.UseSampleDots(0, 1000d, 6d));
+        }
     }
 }
