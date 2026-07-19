@@ -72,5 +72,60 @@ namespace QuickLook.Plugin.XdfViewer.Tests
                 Assert.True(anyChannelNonEmpty, $"stream {se.StreamId} has no non-empty channels");
             }
         }
+
+        [Fact]
+        public void RealFile_WindowedRead_IsBoundedAndFiniteWhenPresent()
+        {
+            var path = SamplePath();
+            if (path == null) return; // skipped when the sample is absent
+
+            var file = XdfReader.Read(path);
+            if (file == null) return;
+
+            // Find a numeric stream with data, then read only a sub-range window of it (the full-view
+            // zoom's core operation).
+            var whole = XdfReader.FillEnvelopes(file, path, new EnvelopeOptions
+            {
+                Buckets = XdfReader.SparklineBuckets,
+                MaxSamplesPerStream = XdfReader.MaxEnvelopeSamplesPerStream
+            });
+            if (whole.Length == 0) return;
+
+            var target = whole.FirstOrDefault(s => s.Channels.Any(c => !c.IsEmpty));
+            if (target == null) return;
+
+            var stream = file.Streams.First(s => s.Id == target.StreamId);
+            long total = stream.SampleCount ?? stream.TalliedSampleCount;
+            if (total < 20) return;
+
+            long start = total / 4;
+            long count = Math.Min(2000, total / 2);
+            int buckets = (int)Math.Min(count, 1000);
+
+            var win = XdfReader.FillEnvelopes(file, path, new EnvelopeOptions
+            {
+                OnlyStreamId = target.StreamId,
+                StartSample = start,
+                WindowSampleCount = count,
+                Buckets = buckets,
+                MaxSamplesPerStream = XdfReader.MaxEnvelopeSamplesPerStreamFull
+            });
+
+            var wse = Assert.Single(win);
+            Assert.NotEmpty(wse.Channels);
+
+            bool anyNonEmpty = false;
+            foreach (var ch in wse.Channels)
+            {
+                Assert.Equal(buckets, ch.BucketCount);
+                Assert.False(float.IsNaN(ch.DataMin));
+                Assert.False(float.IsInfinity(ch.DataMin));
+                Assert.False(float.IsNaN(ch.DataMax));
+                Assert.False(float.IsInfinity(ch.DataMax));
+                Assert.True(ch.DataMin <= ch.DataMax);
+                if (!ch.IsEmpty) anyNonEmpty = true;
+            }
+            Assert.True(anyNonEmpty, "windowed read produced no non-empty channels");
+        }
     }
 }

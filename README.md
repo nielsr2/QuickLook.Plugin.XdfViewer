@@ -31,6 +31,31 @@ memory and load time stay bounded regardless of recording size. Marker
 streams are event streams, not waveforms, so their rows show timestamps/values
 and no sparkline.
 
+### Full-window view (zoomable)
+
+Click the expanded plot again to open a full-window view of that single
+channel — a windowed signal viewer:
+
+- **Zoom:** mouse wheel zooms in/out, anchored on the cursor, all the way down
+  to individual samples. **Pan:** Shift+wheel (or a horizontal trackpad swipe),
+  click-and-drag on the plot, dragging the viewport box on the top-right
+  **minimap**, or the horizontal **scrollbar** — all kept in sync.
+- **Sample-accurate:** once the zoom reaches roughly one sample per few pixels
+  the band switches to discrete **sample dots** and a "sample-accurate" badge
+  appears, so it's obvious you're looking at real samples rather than a min/max
+  envelope.
+- **Vertical scale:** the slider amplifies amplitude about a robust baseline;
+  the amplitude (Y) axis and baseline stay fixed while you pan, and the time
+  (X) axis relabels for the visible window.
+
+Only the **visible window** is decoded on each zoom/pan (a debounced,
+sub-range read), so panning/zooming stays responsive even on large recordings;
+a transient scale gives instant feedback until the crisp read lands. The
+Pass-1 chunk index is built once and reused across every interaction, so the
+whole file is never re-scanned per action. (One known limit: a stream written
+as a single enormous `Samples` chunk must be decoded from the chunk start —
+uncommon, since LabRecorder chunks periodically.)
+
 ## Install
 
 Open the `.qlplugin` with QuickLook (Space on the file), or drop it into
@@ -55,6 +80,13 @@ restart QuickLook.
    Windows/QuickLook themes.
 10. A 144-channel EMG (e.g. Trigno) stream scrolls smoothly with sparklines
     rendered per row.
+11. Click the expanded plot → full-window view opens with top/bottom padding,
+    a minimap (top-right), a time axis, and an amplitude axis.
+12. Mouse wheel zooms about the cursor; Shift+wheel, click-drag, minimap drag,
+    and the scrollbar all pan, staying in sync. Zoom in far enough → sample
+    dots + a "sample-accurate" badge appear.
+13. On a large recording the full view stays responsive while zooming/panning
+    (instant feedback, then a crisp redraw a beat later).
 
 ## Test
 
