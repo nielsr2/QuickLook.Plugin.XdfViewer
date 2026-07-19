@@ -127,7 +127,8 @@
       </ScrollViewer>
     </DockPanel>
 
-    <!-- Full-window, horizontally-scrollable view of one channel (the 3rd zoom level).
+    <!-- Full-window view of one channel (the 3rd zoom level): a windowed signal viewer.
+         Wheel zooms (down to individual samples), Shift+wheel / drag / minimap / scrollbar pan.
          Overlays the whole panel; DataContext is set to the clicked ChannelViewModel. -->
     <Grid x:Name="FullView" Visibility="Collapsed"
           Background="{DynamicResource PanelBackground}">
@@ -142,7 +143,7 @@
         </DockPanel>
         <TextBlock x:Name="FullViewSubtitle" DockPanel.Dock="Top" Opacity="0.6"
                    FontSize="11" Margin="0,0,0,6"/>
-        <!-- Vertical-scale (amplitude gain) control -->
+        <!-- Vertical-scale (amplitude gain) control + interaction hint -->
         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
           <TextBlock Text="Vertical scale" Opacity="0.7" FontSize="11" VerticalAlignment="Center"/>
           <Slider x:Name="GainSlider" Minimum="1" Maximum="25" Value="1" Width="180"
@@ -150,8 +151,10 @@
                   ValueChanged="GainSlider_ValueChanged"/>
           <TextBlock x:Name="GainLabel" Text="×1" Opacity="0.7" FontSize="11"
                      VerticalAlignment="Center" MinWidth="34"/>
+          <TextBlock Text="Wheel = zoom · Shift+wheel / drag = pan" Opacity="0.4"
+                     FontSize="11" VerticalAlignment="Center" Margin="16,0,0,0"/>
         </StackPanel>
-        <!-- Plot: fixed amplitude axis (left) + horizontally-scrollable waveform, time axis below -->
+        <!-- Plot: fixed amplitude axis (left) + waveform (fills), time axis + scrollbar below -->
         <Grid>
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto"/>
@@ -160,11 +163,10 @@
           <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
           </Grid.RowDefinitions>
-          <!-- Amplitude (Y) axis: sized to the waveform's viewport so labels line up -->
-          <Grid Grid.Column="0" Grid.Row="0" Width="62" Margin="0,0,4,0"
-                VerticalAlignment="Top"
-                Height="{Binding ViewportHeight, ElementName=FullScroll}">
+          <!-- Amplitude (Y) axis: inset top/bottom to match the waveform's vertical padding -->
+          <Grid Grid.Column="0" Grid.Row="0" Width="62" Margin="0,12,4,12">
             <TextBlock x:Name="YMaxLabel" VerticalAlignment="Top" HorizontalAlignment="Right"
                        FontSize="10" Opacity="0.7"/>
             <TextBlock x:Name="YMidLabel" VerticalAlignment="Center" HorizontalAlignment="Right"
@@ -172,22 +174,50 @@
             <TextBlock x:Name="YMinLabel" VerticalAlignment="Bottom" HorizontalAlignment="Right"
                        FontSize="10" Opacity="0.7"/>
           </Grid>
-          <!-- Waveform (scrolls horizontally) -->
-          <ScrollViewer x:Name="FullScroll" Grid.Column="1" Grid.Row="0"
-                        HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
-                        ScrollChanged="FullScroll_ScrollChanged"
-                        PreviewMouseWheel="FullScroll_PreviewMouseWheel">
+          <!-- Waveform cell (fills): hosts the wave, the sample-accurate badge, and the minimap.
+               Handles wheel-zoom and click-drag-pan; clips the transient zoom transform. -->
+          <Grid x:Name="PlotCell" Grid.Column="1" Grid.Row="0" Background="Transparent"
+                ClipToBounds="True"
+                PreviewMouseWheel="PlotCell_PreviewMouseWheel"
+                MouseLeftButtonDown="PlotCell_MouseLeftButtonDown"
+                MouseMove="PlotCell_MouseMove"
+                MouseLeftButtonUp="PlotCell_MouseLeftButtonUp"
+                SizeChanged="PlotCell_SizeChanged">
             <controls:WaveformSparkline x:Name="FullWave" ShowGrid="True" Filled="True"
-                       Height="{Binding ViewportHeight, ElementName=FullScroll}"
-                       Envelope="{Binding FullDetail}"
+                       VerticalInset="12" SampleDotThresholdPx="6"
                        LineBrush="{DynamicResource WaveformBrush}"/>
-          </ScrollViewer>
-          <!-- Time (X) axis: scrolls in lock-step with the waveform -->
-          <ScrollViewer x:Name="TimeScroll" Grid.Column="1" Grid.Row="1"
-                        HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
-            <controls:TimeAxis x:Name="TimeAxisEl" Height="22"
-                       LabelBrush="{DynamicResource WaveformBrush}"/>
-          </ScrollViewer>
+            <!-- Sample-accurate indicator (top-left), shown once zoom reaches ~1 sample/bucket -->
+            <Border x:Name="SampleBadge" Visibility="Collapsed"
+                    HorizontalAlignment="Left" VerticalAlignment="Top" Margin="6,6,0,0"
+                    Background="#663FB950" CornerRadius="3" Padding="6,2">
+              <TextBlock x:Name="SampleBadgeText" FontSize="10" Foreground="White"/>
+            </Border>
+            <!-- Minimap navigator (top-right): whole-channel overview + draggable viewport rect -->
+            <Border x:Name="Minimap" HorizontalAlignment="Right" VerticalAlignment="Top"
+                    Margin="0,6,6,0" Width="184" Height="56" CornerRadius="4"
+                    Background="#40000000" BorderBrush="#55888888" BorderThickness="1"
+                    Cursor="Hand"
+                    MouseLeftButtonDown="Mini_MouseLeftButtonDown"
+                    MouseMove="Mini_MouseMove"
+                    MouseLeftButtonUp="Mini_MouseLeftButtonUp">
+              <Grid>
+                <controls:WaveformSparkline x:Name="MiniWave" Filled="True" VerticalInset="4"
+                           Margin="4,4,4,4" Envelope="{Binding FullDetail}"
+                           LineBrush="{DynamicResource WaveformBrush}"
+                           SizeChanged="MiniWave_SizeChanged"/>
+                <Canvas>
+                  <Rectangle x:Name="MiniViewport" Fill="#26FFFFFF" Stroke="#AAFFFFFF"
+                             StrokeThickness="1"/>
+                </Canvas>
+              </Grid>
+            </Border>
+          </Grid>
+          <!-- Time (X) axis for the visible window -->
+          <controls:TimeAxis x:Name="TimeAxisEl" Grid.Column="1" Grid.Row="1" Height="22"
+                     LabelBrush="{DynamicResource WaveformBrush}"/>
+          <!-- Horizontal scrollbar (pan) -->
+          <ScrollBar x:Name="FullScrollBar" Grid.Column="1" Grid.Row="2" Orientation="Horizontal"
+                     Margin="0,2,0,0" Minimum="0" Scroll="FullScrollBar_Scroll"/>
         </Grid>
       </DockPanel>
     </Grid>
