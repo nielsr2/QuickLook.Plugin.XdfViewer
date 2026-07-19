@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using System.Windows.Threading;
@@ -57,6 +58,46 @@ namespace QuickLook.Plugin.XdfViewer
             // Overridden per-theme in ApplyTheme; this dark default covers Themes.None.
             Resources["PanelBackground"] = new SolidColorBrush(Color.FromRgb(0x1E, 0x1E, 0x1E));
             InitializeComponent();
+            // Hook the top-level window so trackpad horizontal scroll (WM_MOUSEHWHEEL, which WPF does
+            // not surface as a routed event) can pan the full view.
+            Loaded += OnPanelLoaded;
+            Unloaded += OnPanelUnloaded;
+        }
+
+        private HwndSource _hwndSource;
+        private const int WM_MOUSEHWHEEL = 0x020E;
+
+        private void OnPanelLoaded(object sender, RoutedEventArgs e)
+        {
+            _hwndSource = PresentationSource.FromVisual(this) as HwndSource;
+            _hwndSource?.AddHook(WndHook);
+        }
+
+        private void OnPanelUnloaded(object sender, RoutedEventArgs e)
+        {
+            if (_hwndSource != null) { _hwndSource.RemoveHook(WndHook); _hwndSource = null; }
+        }
+
+        private IntPtr WndHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            if (msg != WM_MOUSEHWHEEL || _fullChannel == null || FullView.Visibility != Visibility.Visible)
+                return IntPtr.Zero;
+
+            long w = IntPtr.Size == 8 ? wParam.ToInt64() : (uint)wParam.ToInt32();
+            int delta = (short)((w >> 16) & 0xFFFF);
+            if (delta == 0) return IntPtr.Zero;
+
+            // Only act when the pointer is over the plot (DPI-safe via WPF hit coordinates).
+            var p = Mouse.GetPosition(PlotCell);
+            if (p.X < 0 || p.Y < 0 || p.X > PlotCell.ActualWidth || p.Y > PlotCell.ActualHeight)
+                return IntPtr.Zero;
+
+            // Tilt/scroll right (delta > 0) advances the window forward in time.
+            double panSamples = (delta / 120.0) * _viewCount * 0.2;
+            var v = FullViewMath.Pan(_viewStart, _viewCount, _totalSamples, panSamples);
+            SetView(v.Start, v.Count);
+            handled = true;
+            return IntPtr.Zero;
         }
 
         /// <summary>Records the source file path/model so on-demand hi-res reads can re-open it later.</summary>
@@ -436,23 +477,41 @@ namespace QuickLook.Plugin.XdfViewer
             double vp = ViewportPx;
             if (vp <= 0) return;
 
-            if ((Keyboard.Modifiers & ModifierKeys.Shift) != 0)
-            {
-                // Shift+wheel = pan. Wheel up (Delta>0) moves the window toward the start.
-                double delta = -Math.Sign(e.Delta) * _viewCount * 0.15;
-                var w = FullViewMath.Pan(_viewStart, _viewCount, _totalSamples, delta);
-                SetView(w.Start, w.Count);
-            }
-            else
-            {
-                // Plain wheel = zoom about the cursor. Wheel up = zoom in.
-                double frac = e.GetPosition(FullWave).X / vp;
-                if (frac < 0) frac = 0; else if (frac > 1) frac = 1;
-                double factor = e.Delta > 0 ? 1.0 / ZoomStep : ZoomStep;
-                var w = FullViewMath.ZoomAboutCursor(_viewStart, _viewCount, _totalSamples, frac, factor, MinViewCount);
-                SetView(w.Start, w.Count);
-            }
+            bool shift = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
+            // Mouse: plain vertical wheel pans, Shift+wheel zooms. Trackpad: fine-grained vertical
+            // scrolling zooms (no Shift). Shift flips whichever the device does, so both actions are
+            // always reachable even if the device heuristic guesses wrong.
+            bool zoom = IsMouseWheelNotch(e.Delta) ? shift : !shift;
+
+            if (zoom) ZoomByWheel(e.Delta, e.GetPosition(FullWave).X, vp);
+            else PanByWheel(e.Delta);
             e.Handled = true;
+        }
+
+        /// <summary>Standard mouse wheels click in ±120 detents; precision-trackpad scrolling reports
+        /// finer, non-120 deltas. Used to pick the default action (mouse ⇒ pan, trackpad ⇒ zoom).</summary>
+        private static bool IsMouseWheelNotch(int delta)
+        {
+            int a = Math.Abs(delta);
+            return a >= 120 && a % 120 == 0;
+        }
+
+        private void ZoomByWheel(int delta, double cursorX, double vp)
+        {
+            double frac = cursorX / vp;
+            if (frac < 0) frac = 0; else if (frac > 1) frac = 1;
+            // Scale by delta so mouse notches feel discrete and trackpad scrolling feels smooth.
+            double factor = Math.Pow(ZoomStep, -(delta / 120.0)); // scroll up (delta>0) => zoom in
+            var w = FullViewMath.ZoomAboutCursor(_viewStart, _viewCount, _totalSamples, frac, factor, MinViewCount);
+            SetView(w.Start, w.Count);
+        }
+
+        private void PanByWheel(int delta)
+        {
+            // Scroll up (delta>0) moves the window toward the start.
+            double panSamples = -(delta / 120.0) * _viewCount * 0.2;
+            var w = FullViewMath.Pan(_viewStart, _viewCount, _totalSamples, panSamples);
+            SetView(w.Start, w.Count);
         }
 
         private void PlotCell_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
