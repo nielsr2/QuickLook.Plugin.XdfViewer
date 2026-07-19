@@ -212,6 +212,8 @@ namespace QuickLook.Plugin.XdfViewer
             FullWave.Envelope = cvm.FullDetail;
 
             FullView.Visibility = Visibility.Visible;
+            // Grab keyboard focus once the overlay is laid out, so Esc/Home/End work right away.
+            Dispatcher.BeginInvoke(new Action(() => FullView.Focus()), DispatcherPriority.Input);
             SetView(0, _totalSamples);   // zeroes the window and paints axes/chrome/minimap
 
             if (cvm.FullDetail == null) LoadFullDetail(cvm);   // whole-channel read (also the scaling + minimap source)
@@ -271,13 +273,29 @@ namespace QuickLook.Plugin.XdfViewer
             return sb.ToString();
         }
 
-        private void CloseFullView_Click(object sender, RoutedEventArgs e)
+        private void CloseFullView_Click(object sender, RoutedEventArgs e) => CloseFullView();
+
+        private void CloseFullView()
         {
             _readTimer?.Stop();
             _fullReadSeq++;
+            HideCrosshair();
             FullView.Visibility = Visibility.Collapsed;
             FullView.DataContext = null;
             _fullChannel = null;
+        }
+
+        /// <summary>Keyboard nav for the full view: Esc closes; Home/End jump to the start/end of the
+        /// stream (keeping the current zoom width). Arrow/+/- are intentionally not bound.</summary>
+        private void FullView_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (_fullChannel == null) return;
+            switch (e.Key)
+            {
+                case Key.Escape: CloseFullView(); e.Handled = true; break;
+                case Key.Home: SetView(0, _viewCount); e.Handled = true; break;
+                case Key.End: SetView(_totalSamples - _viewCount, _viewCount); e.Handled = true; break;
+            }
         }
 
         private void GainSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -517,6 +535,15 @@ namespace QuickLook.Plugin.XdfViewer
         private void PlotCell_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (_fullChannel == null) return;
+            FullView.Focus();   // so Esc/Home/End reach the key handler after a click
+
+            if (e.ClickCount == 2)   // double-click resets to fully zoomed out
+            {
+                GainSlider.Value = 1.0;
+                SetView(0, _totalSamples);
+                return;
+            }
+
             _dragging = true;
             _dragAnchorPx = e.GetPosition(FullWave).X;
             _dragAnchorStart = _viewStart;
@@ -526,12 +553,63 @@ namespace QuickLook.Plugin.XdfViewer
 
         private void PlotCell_MouseMove(object sender, MouseEventArgs e)
         {
-            if (!_dragging) return;
+            var p = e.GetPosition(FullWave);
+            if (!_dragging) { UpdateCrosshair(p); return; }
+
+            HideCrosshair();               // no crosshair while panning
             double vp = ViewportPx;
             if (vp <= 0) return;
-            double dxPx = e.GetPosition(FullWave).X - _dragAnchorPx;
+            double dxPx = p.X - _dragAnchorPx;
             double dSamples = -dxPx * (_viewCount / vp);   // drag right -> window moves toward start
             SetView(_dragAnchorStart + dSamples, _viewCount);
+        }
+
+        private void PlotCell_MouseLeave(object sender, MouseEventArgs e) => HideCrosshair();
+
+        private void HideCrosshair()
+        {
+            if (CrosshairLayer != null) CrosshairLayer.Visibility = Visibility.Collapsed;
+        }
+
+        /// <summary>Positions the hover crosshair at <paramref name="p"/> (FullWave coordinates) and
+        /// writes the readout: time (relative to the stream start) plus, when the amplitude scale is
+        /// known, the value under the pointer via the inverse vertical map.</summary>
+        private void UpdateCrosshair(Point p)
+        {
+            if (CrosshairLayer == null || _fullChannel == null) { HideCrosshair(); return; }
+            double vp = ViewportPx;
+            double h = FullWave != null ? FullWave.ActualHeight : 0;
+            if (vp <= 0 || h <= 0 || p.X < 0 || p.X > vp || p.Y < 0 || p.Y > h) { HideCrosshair(); return; }
+
+            CrosshairV.X1 = CrosshairV.X2 = p.X; CrosshairV.Y1 = 0; CrosshairV.Y2 = h;
+            CrosshairH.Y1 = CrosshairH.Y2 = p.Y; CrosshairH.X1 = 0; CrosshairH.X2 = vp;
+
+            double sample = FullViewMath.SampleAtViewX(_viewStart, _viewCount, p.X / vp);
+            double seconds = _totalSamples > 0 ? _durationSec * sample / _totalSamples : 0;
+            string text = Xdf.TimeFormat.FormatClock(seconds);
+
+            var env = _fullChannel.FullDetail;
+            if (env != null && !env.IsEmpty && env.DataMax > env.DataMin)
+            {
+                double center = env.Center;
+                double halfRange = Math.Max(env.DataMax - center, center - env.DataMin);
+                if (halfRange <= 0) halfRange = (env.DataMax - env.DataMin) / 2.0;
+                double gain = FullWave.Gain < 1 ? 1 : FullWave.Gain;
+                double val = Controls.WaveformSparkline.InvMapYInset(p.Y, center, halfRange, h, gain, Inset);
+                text += "   " + FmtAxis(val);
+                if (!string.IsNullOrEmpty(_fullChannel.Unit)) text += " " + _fullChannel.Unit;
+            }
+            CrosshairText.Text = text;
+
+            // Keep the readout chip beside the pointer but inside the plot.
+            CrosshairReadout.Measure(new Size(vp, h));
+            double rw = CrosshairReadout.DesiredSize.Width, rh = CrosshairReadout.DesiredSize.Height;
+            double left = p.X + 10; if (left + rw > vp) left = p.X - 10 - rw; if (left < 0) left = 0;
+            double top = p.Y + 12; if (top + rh > h) top = p.Y - 12 - rh; if (top < 0) top = 0;
+            Canvas.SetLeft(CrosshairReadout, left);
+            Canvas.SetTop(CrosshairReadout, top);
+
+            CrosshairLayer.Visibility = Visibility.Visible;
         }
 
         private void PlotCell_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)

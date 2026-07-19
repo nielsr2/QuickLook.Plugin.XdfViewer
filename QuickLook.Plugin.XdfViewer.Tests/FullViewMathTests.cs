@@ -84,5 +84,37 @@ namespace QuickLook.Plugin.XdfViewer.Tests
             Assert.Equal(0, w.Count, P);
             Assert.Equal(0, w.Start, P);
         }
+
+        // --- SampleAtViewX: which sample sits under a cursor at fractional x (hover crosshair) ---
+
+        [Fact]
+        public void SampleAtViewX_LeftEdge_IsStart()
+        {
+            Assert.Equal(200, FullViewMath.SampleAtViewX(start: 200, count: 100, xFrac: 0.0), P);
+        }
+
+        [Fact]
+        public void SampleAtViewX_RightEdge_IsStartPlusCount()
+        {
+            Assert.Equal(300, FullViewMath.SampleAtViewX(start: 200, count: 100, xFrac: 1.0), P);
+        }
+
+        [Fact]
+        public void SampleAtViewX_Middle_IsProportional()
+        {
+            Assert.Equal(250, FullViewMath.SampleAtViewX(start: 200, count: 100, xFrac: 0.5), P);
+        }
+
+        [Fact]
+        public void SampleAtViewX_FractionBelowZero_ClampsToStart()
+        {
+            Assert.Equal(200, FullViewMath.SampleAtViewX(start: 200, count: 100, xFrac: -0.3), P);
+        }
+
+        [Fact]
+        public void SampleAtViewX_FractionAboveOne_ClampsToEnd()
+        {
+            Assert.Equal(300, FullViewMath.SampleAtViewX(start: 200, count: 100, xFrac: 1.4), P);
+        }
     }
 }

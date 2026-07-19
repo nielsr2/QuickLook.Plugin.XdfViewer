@@ -350,6 +350,22 @@ namespace QuickLook.Plugin.XdfViewer.Controls
             return inset + MapYPivot(value, center, halfRange, usable, gain);
         }
 
+        /// <summary>
+        /// Inverse of <see cref="MapYInset"/>: the data value at a vertical pixel position
+        /// <paramref name="y"/> (for the hover-crosshair amplitude readout). A flat channel
+        /// (<paramref name="halfRange"/> ≤ 0) has no invertible amplitude, so returns
+        /// <paramref name="center"/>. Not clamped — a cursor outside the band reads past the data
+        /// range, which is fine for a readout. Pure/WPF-free.
+        /// </summary>
+        internal static double InvMapYInset(double y, double center, double halfRange, double height, double gain, double inset)
+        {
+            double usable = height - 2 * inset;
+            if (usable <= 0) { usable = height; inset = 0; }
+            if (halfRange <= 0 || gain <= 0 || usable <= 0) return center;
+            double t = 1 - 2 * (y - inset) / usable; // inverse of y = inset + usable/2*(1 - t)
+            return center + t * halfRange / gain;
+        }
+
         /// <summary>Maps a bucket index to a horizontal pixel position across [0, width]. Pure/WPF-free.</summary>
         internal static double MapX(int bucket, int bucketCount, double width)
         {

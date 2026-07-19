@@ -137,8 +137,9 @@
     <!-- Full-window view of one channel (the 3rd zoom level): a windowed signal viewer.
          Wheel zooms (down to individual samples), Shift+wheel / drag / minimap / scrollbar pan.
          Overlays the whole panel; DataContext is set to the clicked ChannelViewModel. -->
-    <Grid x:Name="FullView" Visibility="Collapsed"
-          Background="{DynamicResource PanelBackground}">
+    <Grid x:Name="FullView" Visibility="Collapsed" Focusable="True" FocusVisualStyle="{x:Null}"
+          Background="{DynamicResource PanelBackground}"
+          PreviewKeyDown="FullView_PreviewKeyDown">
       <DockPanel Margin="4">
         <DockPanel DockPanel.Dock="Top" Margin="0,0,0,4">
           <Button DockPanel.Dock="Right" Content="✕ Close" Padding="10,3" Cursor="Hand"
@@ -212,11 +213,23 @@
                 MouseLeftButtonDown="PlotCell_MouseLeftButtonDown"
                 MouseMove="PlotCell_MouseMove"
                 MouseLeftButtonUp="PlotCell_MouseLeftButtonUp"
+                MouseLeave="PlotCell_MouseLeave"
                 LostMouseCapture="PlotCell_LostMouseCapture"
                 SizeChanged="PlotCell_SizeChanged">
             <controls:WaveformSparkline x:Name="FullWave" ShowGrid="True" Filled="True"
                        VerticalInset="12" SampleDotThresholdPx="6"
                        LineBrush="{DynamicResource WaveformBrush}"/>
+            <!-- Hover crosshair: dashed vertical+horizontal guides + a time/amplitude readout.
+                 IsHitTestVisible=False so PlotCell keeps receiving wheel/drag/move. -->
+            <Canvas x:Name="CrosshairLayer" IsHitTestVisible="False" Visibility="Collapsed">
+              <Line x:Name="CrosshairV" StrokeThickness="1" StrokeDashArray="3 3" Opacity="0.55"
+                    Stroke="{DynamicResource WaveformBrush}"/>
+              <Line x:Name="CrosshairH" StrokeThickness="1" StrokeDashArray="3 3" Opacity="0.55"
+                    Stroke="{DynamicResource WaveformBrush}"/>
+              <Border x:Name="CrosshairReadout" Background="#CC000000" CornerRadius="3" Padding="5,2">
+                <TextBlock x:Name="CrosshairText" FontSize="10" Foreground="White"/>
+              </Border>
+            </Canvas>
             <!-- Sample-accurate indicator (top-left), shown once zoom reaches ~1 sample/bucket -->
             <Border x:Name="SampleBadge" Visibility="Collapsed"
                     HorizontalAlignment="Left" VerticalAlignment="Top" Margin="6,6,0,0"
