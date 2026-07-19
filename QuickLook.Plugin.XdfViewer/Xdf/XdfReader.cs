@@ -115,41 +115,53 @@ namespace QuickLook.Plugin.XdfViewer.Xdf
 
             // Pass 1 (index): walk chunks, decoding nothing, and record where each Samples chunk's
             // value payload lives so Pass 2 can seek straight back to only the chunks it needs.
-            var chunksByStream = new Dictionary<uint, List<EnvelopeChunkRef>>();
-            try
+            // Built once and memoized on the file, so later reads (expand/full view/every zoom step)
+            // skip this whole-file walk. The offsets are valid for any read over the same content.
+            Dictionary<uint, List<EnvelopeChunkRef>> chunksByStream;
+            if (file.ChunkIndex != null)
             {
-                while (stream.Position < stream.Length)
-                {
-                    long len = reader.ReadVarLength();
-                    long tagPos = stream.Position;
-                    long contentEnd = tagPos + len;
-                    if (len < 2 || contentEnd < tagPos || contentEnd > stream.Length)
-                        break;
-                    var tag = (XdfChunkTag)reader.ReadUInt16();
-
-                    if (tag == XdfChunkTag.Samples)
-                    {
-                        uint streamId = reader.ReadUInt32();
-                        long numSamples = reader.ReadVarLength();
-                        long valuesStart = stream.Position;
-
-                        if (!chunksByStream.TryGetValue(streamId, out var chunks))
-                        {
-                            chunks = new List<EnvelopeChunkRef>();
-                            chunksByStream[streamId] = chunks;
-                        }
-                        chunks.Add(new EnvelopeChunkRef
-                        {
-                            ValuesStart = valuesStart,
-                            ContentEnd = contentEnd,
-                            NumSamples = numSamples
-                        });
-                    }
-
-                    stream.Seek(contentEnd, SeekOrigin.Begin); // always resync to chunk boundary
-                }
+                chunksByStream = file.ChunkIndex.ByStream;
             }
-            catch (Exception) { /* stop indexing; decode whatever chunks were captured */ }
+            else
+            {
+                var index = new XdfChunkIndex();
+                chunksByStream = index.ByStream;
+                try
+                {
+                    while (stream.Position < stream.Length)
+                    {
+                        long len = reader.ReadVarLength();
+                        long tagPos = stream.Position;
+                        long contentEnd = tagPos + len;
+                        if (len < 2 || contentEnd < tagPos || contentEnd > stream.Length)
+                            break;
+                        var tag = (XdfChunkTag)reader.ReadUInt16();
+
+                        if (tag == XdfChunkTag.Samples)
+                        {
+                            uint streamId = reader.ReadUInt32();
+                            long numSamples = reader.ReadVarLength();
+                            long valuesStart = stream.Position;
+
+                            if (!chunksByStream.TryGetValue(streamId, out var chunks))
+                            {
+                                chunks = new List<EnvelopeChunkRef>();
+                                chunksByStream[streamId] = chunks;
+                            }
+                            chunks.Add(new EnvelopeChunkRef
+                            {
+                                ValuesStart = valuesStart,
+                                ContentEnd = contentEnd,
+                                NumSamples = numSamples
+                            });
+                        }
+
+                        stream.Seek(contentEnd, SeekOrigin.Begin); // always resync to chunk boundary
+                    }
+                }
+                catch (Exception) { /* stop indexing; decode whatever chunks were captured */ }
+                file.ChunkIndex = index;
+            }
 
             // Target streams: numeric channel format, at least one channel, at least one indexed
             // sample, and matching the optional single-stream filter.
@@ -289,13 +301,6 @@ namespace QuickLook.Plugin.XdfViewer.Xdf
                 Channels = dec.Build(approximate),
                 IsApproximate = approximate
             };
-        }
-
-        private struct EnvelopeChunkRef
-        {
-            public long ValuesStart;
-            public long ContentEnd;
-            public long NumSamples;
         }
 
         private static string ReadXml(BinaryReader reader, long contentEnd)

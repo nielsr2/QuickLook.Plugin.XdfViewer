@@ -11,6 +11,13 @@ namespace QuickLook.Plugin.XdfViewer.Xdf.Model
         public bool IsTruncated { get; set; }
         public List<XdfStream> Streams { get; } = new List<XdfStream>();
 
+        /// <summary>
+        /// Cached Pass-1 chunk index, populated on the first <c>FillEnvelopes</c> call and reused by
+        /// all later envelope reads so they skip the full-file walk. Internal implementation detail;
+        /// not part of the parsed model.
+        /// </summary>
+        internal XdfChunkIndex ChunkIndex { get; set; }
+
         /// <summary>Wall-clock span from the earliest first_timestamp to the latest last_timestamp.</summary>
         public double? TotalDuration
         {
