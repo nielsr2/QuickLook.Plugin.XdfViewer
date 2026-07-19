@@ -53,9 +53,12 @@
                   <TextBlock DockPanel.Dock="Top" Text="{Binding ChannelsLine}" Opacity="0.8" Margin="0,6,0,0"/>
                   <TextBlock DockPanel.Dock="Top" Text="{Binding RateLine}" Opacity="0.8"/>
                   <TextBlock DockPanel.Dock="Top" Text="{Binding DurationLine}" Opacity="0.8"/>
-                  <!-- Fills the card's remaining height; expanded by default so the window shows content -->
+                  <!-- Top-anchored: sits directly under the metadata rather than floating in the
+                       middle of a tall card, and grows downward as far as the card allows (the list
+                       inside scrolls once it runs out of room). -->
                   <Expander Header="{Binding ExpanderHeader}" Margin="0,6,0,0"
-                            IsExpanded="True" VerticalContentAlignment="Stretch">
+                            IsExpanded="True" VerticalAlignment="Top"
+                            VerticalContentAlignment="Stretch">
                     <Grid>
                       <!-- Channels (numeric streams) -->
                       <ItemsControl ItemsSource="{Binding Channels}"
