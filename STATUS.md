@@ -52,32 +52,34 @@
   `AssemblyInfo.cs` version (`0.1.0.0`) vs the git-commit-count package version.
 - ClockOffset-corrected absolute/cross-stream timestamps (likely overkill for a preview).
 
-## Before renaming the root dir + flattening the layout
+## Layout: flattened ✔ (2026-07-19, branch `chore/flatten-repo-layout`)
 
-Renaming **only the root dir** is safe — every internal path is relative. If you also **flatten**
-(move the plugin project up / change folder layout), update these *together*, then re-test:
+The plugin project now lives at the **repo root** — the conventional QuickLook layout (matches the
+`QuickLook.Plugin.HelloWorld` template and `OfficeViewer`). The old doubled
+`QuickLook.Plugin.XdfViewer/QuickLook.Plugin.XdfViewer/` nesting is gone. What was done:
 
-- **Git submodule** `QuickLook.Common` — `.gitmodules` path is
-  `QuickLook.Plugin.XdfViewer/QuickLook.Common`. If the plugin folder moves, `git mv` it, fix
-  `.gitmodules`, then `git submodule sync`.
-- **`QuickLook.Plugin.XdfViewer.sln`** — references both project folders.
-- **`QuickLook.Plugin.XdfViewer.Tests.csproj`** — `ProjectReference` to the plugin csproj (relative).
-- **`Directory.Build.props`** (repo root) + root **`Scripts/update-version.ps1`** — QuickLook.Common's
-  prebuild calls `$(SolutionDir)Scripts\update-version.ps1`; keep `Directory.Build.props` at the repo
-  root, above all projects.
-- **`QuickLook.Plugin.XdfViewer/Scripts/pack-zip.ps1`** — resolves the project via `$PSScriptRoot\..`;
-  keep it inside the plugin project's `Scripts/`.
-- **`.github/workflows/build.yml`** — hardcodes `QuickLook.Plugin.XdfViewer/...` paths (csproj, pack
-  script, artifact). Update to the new layout.
-- Do it with this session **closed** (as planned) so nothing holds the directories open.
+- `git mv`'d the plugin project up (csproj, all sources, `QuickLook.Plugin.Metadata.Base.config`, the
+  `QuickLook.Common` submodule, `Scripts/pack-zip.ps1`) and merged the two `Scripts/` dirs.
+- Updated `.gitmodules` (submodule `path` → `QuickLook.Common`), the `.sln` project paths, the Tests
+  `ProjectReference`, and the `.github/workflows/build.yml` paths.
+- Added a glob guard to the plugin csproj so it doesn't compile the sibling `…Tests/` folder (the
+  csproj now sits at the root, where SDK default-compile globs everything below it).
+- `pack-zip.ps1` needed **no** edits (all paths are relative to `$PSScriptRoot\..`); ditto
+  `Directory.Build.props` / `Scripts/update-version.ps1` (still repo-root, `$(SolutionDir)` resolves).
+- Verified: Release build **0 warnings**, **170/170 tests**, full-`.sln` build, `pack-zip` →
+  root `QuickLook.Plugin.XdfViewer.qlplugin`.
+
+**Left as-is (cosmetic, harmless):** the submodule *section name* in `.gitmodules` / `.git/config` is
+still `QuickLook.Plugin.XdfViewer/QuickLook.Common` — `git mv` only rewrites `path`, not the label.
+Renaming the outer working-copy folder is likewise cosmetic and does not change the committed repo.
 
 ## Quick commands
 
 ```
 # build / test / pack
-dotnet build QuickLook.Plugin.XdfViewer/QuickLook.Plugin.XdfViewer.csproj -c Release
+dotnet build QuickLook.Plugin.XdfViewer.csproj -c Release
 dotnet test  QuickLook.Plugin.XdfViewer.Tests -c Debug           # 170 tests
-pwsh QuickLook.Plugin.XdfViewer/Scripts/pack-zip.ps1 -Configuration Release
+pwsh Scripts/pack-zip.ps1 -Configuration Release
 
 # merge the feature branch when you're happy
 git checkout master && git merge --no-ff feat/channel-waveforms

@@ -14,6 +14,6 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="2.5.7" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\QuickLook.Plugin.XdfViewer\QuickLook.Plugin.XdfViewer.csproj" />
+    <ProjectReference Include="..\QuickLook.Plugin.XdfViewer.csproj" />
   </ItemGroup>
 </Project>
