@@ -78,6 +78,7 @@ namespace QuickLook.Plugin.XdfViewer
         {
             Resources.Add("BoolToVis", new BooleanToVisibilityConverter());
             Resources.Add("InverseBoolToVis", new InverseBooleanToVisibilityConverter());
+            Resources.Add("KindToGeometry", new QuickLook.Plugin.XdfViewer.Resources.StreamKindToGeometryConverter());
             // Opaque backdrop for the full-window overlay so the cards behind it are hidden.
             // Overridden per-theme in ApplyTheme; this dark default covers Themes.None.
             Resources["PanelBackground"] = new SolidColorBrush(Color.FromRgb(0x1E, 0x1E, 0x1E));
