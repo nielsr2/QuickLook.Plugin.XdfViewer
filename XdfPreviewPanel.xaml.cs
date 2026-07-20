@@ -956,12 +956,17 @@ namespace QuickLook.Plugin.XdfViewer
                 Resources["WaveformBrush"] = ResolveWaveformBrush(neutral);
                 Resources["PanelBackground"] = new SolidColorBrush(Color.FromRgb(0xF5, 0xF5, 0xF5));
             }
-            // Themes.None: leave the inherited default (Foreground unset, and sparklines fall
-            // back to WaveformSparkline's own built-in default brush since WaveformBrush is
-            // never registered as a resource in that case). A color-theme change while still in
-            // Themes.None is a no-op here on purpose — there is no neutral brush to fall back to
-            // yet, and the real theme will be applied (and WaveformBrush (re)computed) shortly
-            // after via Plugin.cs's call to ApplyTheme(context.Theme).
+            else
+            {
+                // Themes.None: leave Foreground/PanelBackground at their inherited/constructor
+                // defaults, as before. But this is this plugin's common real-world runtime state
+                // (ContextObject.Theme defaults to None, and not every host explicitly overrides it
+                // before View() runs) rather than a rare edge case, so the waveform color-theme
+                // picker must still work here — recompute WaveformBrush too, falling back to the
+                // same neutral gray the constructor seeds it with when no theme is chosen.
+                var neutral = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88));
+                Resources["WaveformBrush"] = ResolveWaveformBrush(neutral);
+            }
         }
 
         /// <summary>Mono reproduces today's exact behavior (accent == neutral foreground); the other
