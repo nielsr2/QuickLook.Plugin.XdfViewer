@@ -17,7 +17,7 @@ namespace QuickLook.Plugin.XdfViewer.Settings
 
         public static WaveformColorTheme WaveformColorTheme
         {
-            get => ParseEnum("WaveformColorTheme", WaveformColorTheme.Mono);
+            get => ParseEnum("WaveformColorTheme", WaveformColorTheme.Berry);
             set => SettingHelper.Set("WaveformColorTheme", value.ToString(), Domain);
         }
 

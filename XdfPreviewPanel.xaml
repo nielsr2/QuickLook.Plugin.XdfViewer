@@ -105,7 +105,11 @@
                                       Converter={StaticResource InverseBoolToVis}}">
                         <ItemsControl.Template>
                           <ControlTemplate>
-                            <ScrollViewer VerticalScrollBarVisibility="Auto" CanContentScroll="True">
+                            <!-- Right padding reserves a gutter for the scrollbar thumb, which
+                                 otherwise floats on top of the content (rather than in its own
+                                 column) and covered the right edge of the sparklines. -->
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" CanContentScroll="True"
+                                          Padding="0,0,14,0">
                               <ItemsPresenter/>
                             </ScrollViewer>
                           </ControlTemplate>
@@ -170,7 +174,7 @@
                                       Converter={StaticResource BoolToVis}}">
                         <ItemsControl.Template>
                           <ControlTemplate>
-                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,0,14,0">
                               <ItemsPresenter/>
                             </ScrollViewer>
                           </ControlTemplate>
