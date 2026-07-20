@@ -18,15 +18,19 @@ if ($LASTEXITCODE -ne 0) { throw "build failed ($Configuration); not packing a s
 
 # QuickLook's installer reads "QuickLook.Plugin.Metadata.config" (NOT the ".Base"
 # template) from the package, and requires /Metadata/Namespace + /Metadata/Version.
-# Generate it from the template and stamp a version (git commit count; "0" fallback).
-$baseConfig = Join-Path $projDir "QuickLook.Plugin.Metadata.Base.config"
-$metaConfig = Join-Path $OutDir  "QuickLook.Plugin.Metadata.config"
+# Generate it from the template and stamp $(PluginVersion) — the same single source
+# of truth the DLL's AssemblyVersion is built from (see Directory.Build.props) — so
+# the packaged metadata and the DLL version can never drift apart.
+$baseConfig  = Join-Path $projDir "QuickLook.Plugin.Metadata.Base.config"
+$metaConfig  = Join-Path $OutDir  "QuickLook.Plugin.Metadata.config"
+$buildProps  = Join-Path $projDir "Directory.Build.props"
+
+[xml]$propsXml = Get-Content -LiteralPath $buildProps
+$version = ($propsXml.Project.PropertyGroup | Where-Object { $_.PluginVersion } | Select-Object -First 1).PluginVersion
+if ([string]::IsNullOrWhiteSpace($version)) { throw "PluginVersion not found in $buildProps" }
 
 [xml]$xml = Get-Content -LiteralPath $baseConfig
-$rev = ""
-try { $rev = (& git -C $projDir rev-list --count HEAD 2>$null) } catch { $rev = "" }
-if ([string]::IsNullOrWhiteSpace($rev)) { $rev = "0" }
-$xml.Metadata.Version = "$rev".Trim()
+$xml.Metadata.Version = "$version".Trim()
 $xml.Save($metaConfig)
 
 # Package = plugin DLL + the generated metadata config. (QuickLook.Common is provided

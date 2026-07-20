@@ -8,9 +8,19 @@
     <Platforms>AnyCPU;x64</Platforms>
     <RootNamespace>QuickLook.Plugin.XdfViewer</RootNamespace>
     <AssemblyName>QuickLook.Plugin.XdfViewer</AssemblyName>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <Deterministic>true</Deterministic>
+    <!-- Title/Product/Description/ComVisible/InternalsVisibleTo stay hand-authored in
+         Properties/AssemblyInfo.cs; only the version attributes are SDK-generated, from
+         <Version> below (single-sourced via $(PluginVersion) in Directory.Build.props). -->
+    <GenerateAssemblyTitleAttribute>false</GenerateAssemblyTitleAttribute>
+    <GenerateAssemblyProductAttribute>false</GenerateAssemblyProductAttribute>
+    <GenerateAssemblyDescriptionAttribute>false</GenerateAssemblyDescriptionAttribute>
+    <GenerateAssemblyCompanyAttribute>false</GenerateAssemblyCompanyAttribute>
+    <GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
+    <GenerateAssemblyCopyrightAttribute>false</GenerateAssemblyCopyrightAttribute>
+    <GenerateComVisibleAttribute>false</GenerateComVisibleAttribute>
+    <Version>$(PluginVersion)</Version>
   </PropertyGroup>
 
   <ItemGroup>

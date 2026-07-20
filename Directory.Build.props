@@ -9,4 +9,16 @@
   <PropertyGroup>
     <SolutionDir Condition="'$(SolutionDir)' == '' Or '$(SolutionDir)' == '*Undefined*'">$(MSBuildThisFileDirectory)</SolutionDir>
   </PropertyGroup>
+
+  <!--
+    Single source of truth for the plugin's public version. The plugin csproj
+    consumes this as <Version> (stamping AssemblyVersion/FileVersion/
+    InformationalVersion via the SDK's generated attributes), and
+    Scripts/pack-zip.ps1 reads it directly to stamp the same number into the
+    packaged QuickLook.Plugin.Metadata.config, so the DLL and the installer
+    metadata can never drift apart.
+  -->
+  <PropertyGroup>
+    <PluginVersion>1.0.0</PluginVersion>
+  </PropertyGroup>
 </Project>

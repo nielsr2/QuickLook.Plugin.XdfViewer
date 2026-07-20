@@ -5,6 +5,10 @@ EMG short recording (only ch. 5).xdf
 # ---- Local dev notes / tooling artifacts (kept locally, not published) ----
 NEXT PLUGINS TO MAKE.md
 docs/superpowers/
+.claude/
+.remember/
+.superpowers/
+.vscode/
 
 # ---- Build output ----
 [Bb]in/
