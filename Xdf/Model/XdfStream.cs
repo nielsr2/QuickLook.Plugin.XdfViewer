@@ -26,7 +26,10 @@ namespace QuickLook.Plugin.XdfViewer.Xdf.Model
         public List<XdfMarker> Markers { get; } = new List<XdfMarker>();
 
         public bool IsMarkerStream =>
-            string.Equals(ChannelFormat, "string", System.StringComparison.OrdinalIgnoreCase);
+            string.Equals(ChannelFormat, "string", System.StringComparison.OrdinalIgnoreCase) &&
+            NominalSampleRate == 0 &&
+            !string.Equals(Type, "VideoRaw", System.StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(Type, "VideoCompressed", System.StringComparison.OrdinalIgnoreCase);
 
         public double? Duration
         {
