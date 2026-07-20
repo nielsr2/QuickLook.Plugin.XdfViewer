@@ -11,9 +11,9 @@ every stream (EEG, ECG, EMG, respiration, accelerometer, markers, and more),
 plus zoomable per-channel waveforms — without loading the raw sample data up
 front.
 
-![Overview: two streams from a Trigno EMG/IMU recording, with per-channel sparklines, unit labels, and a channel filter box](assets/screenshot-overview.png)
+![Overview: two streams from a Trigno EMG/IMU recording, with per-stream-type icons, per-channel sparklines, unit labels, and a channel filter box, in the Purple waveform color theme](assets/screenshot-overview.png)
 
-![Full-window zoom view of a respiration channel, with a hover crosshair showing time and amplitude, a minimap, and pan/zoom controls](assets/screenshot-fullview.png)
+![Full-window zoom view of an EMG channel showing a muscle-activation burst, with a minimap and pan/zoom controls, in the Purple waveform color theme](assets/screenshot-fullview.png)
 
 ## Features
 
