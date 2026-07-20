@@ -1,18 +1,29 @@
 # QuickLook.Plugin.XdfViewer
 
-A [QuickLook](https://github.com/QL-Win/QuickLook) plugin that previews **XDF**
-(Extensible Data Format — LabRecorder / Lab Streaming Layer) recordings: a
-high-level overview of streams, channels, sample counts, durations, and markers,
-plus zoomable per-channel waveforms — without loading the raw sample data up front.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-> Screenshots: _add a couple of screenshots / a short GIF here (overview cards + the
-> full-window zoom view) before publishing._
+A [QuickLook](https://github.com/QL-Win/QuickLook) plugin that previews **XDF**
+(Extensible Data Format) recordings — the format written by
+[**LabRecorder**](https://github.com/labstreaminglayer/App-LabRecorder), the
+standard recorder for **Lab Streaming Layer (LSL)** multi-stream data. Press
+Space in Explorer on a `.xdf` file to get an instant, high-level overview of
+every stream (EEG, ECG, EMG, respiration, accelerometer, markers, and more),
+plus zoomable per-channel waveforms — without loading the raw sample data up
+front.
+
+![Overview: two streams from a Trigno EMG/IMU recording, with per-channel sparklines, unit labels, and a channel filter box](assets/screenshot-overview.png)
+
+![Full-window zoom view of a respiration channel, with a hover crosshair showing time and amplitude, a minimap, and pan/zoom controls](assets/screenshot-fullview.png)
 
 ## Features
 
 - **Instant overview** — one card per stream (name · type, channels · format, rate ·
   samples, duration). The structural parse is cheap, so the overview appears
   immediately; sample decoding happens afterwards and never blocks it.
+- **Per-stream-type icons** — EEG, ECG, EMG, EOG, respiration, GSR, PPG, heart rate,
+  accelerometer, gyroscope, magnetometer, gaze, motion capture, NIRS, audio, video,
+  markers, force, and temperature streams are each recognized and iconified at a
+  glance.
 - **Inline sparklines** for every numeric channel, with a larger decimated plot on
   click and a **full-window, zoomable view** on a second click.
 - **Zoom to individual samples** — wheel zoom anchored on the cursor, four ways to
@@ -189,6 +200,4 @@ dotnet test QuickLook.Plugin.XdfViewer.Tests -c Debug
 
 ## License
 
-Licensed under the **GNU General Public License v3.0** — see [LICENSE](LICENSE). This
-matches [QuickLook](https://github.com/QL-Win/QuickLook) itself (GPL-3.0), whose
-`QuickLook.Common` library this plugin builds against.
+[MIT](LICENSE) © nielsr2.
