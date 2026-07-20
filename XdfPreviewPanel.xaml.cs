@@ -82,6 +82,9 @@ namespace QuickLook.Plugin.XdfViewer
             // Opaque backdrop for the full-window overlay so the cards behind it are hidden.
             // Overridden per-theme in ApplyTheme; this dark default covers Themes.None.
             Resources["PanelBackground"] = new SolidColorBrush(Color.FromRgb(0x1E, 0x1E, 0x1E));
+            // Neutral default so the DynamicResource-bound stream-kind icon isn't left unfilled
+            // (and thus invisible) under Themes.None, where ApplyTheme never registers this key.
+            Resources["WaveformBrush"] = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88));
             InitializeComponent();
             // Hook the top-level window so trackpad horizontal scroll (WM_MOUSEHWHEEL, which WPF does
             // not surface as a routed event) can pan the full view.
