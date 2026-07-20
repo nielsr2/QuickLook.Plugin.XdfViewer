@@ -141,7 +141,6 @@ namespace QuickLook.Plugin.XdfViewer
             _vm = vm;
             BusyText.Visibility = Visibility.Collapsed;
             ErrorText.Visibility = Visibility.Collapsed;
-            FileNameText.Text = vm.FileName;
             SummaryText.Text = vm.Summary;
             StreamsList.ItemsSource = vm.Streams;
 
