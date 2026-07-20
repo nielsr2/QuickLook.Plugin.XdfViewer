@@ -36,6 +36,7 @@
                 <ComboBoxItem>Sunset</ComboBoxItem>
                 <ComboBoxItem>Forest</ComboBoxItem>
                 <ComboBoxItem>Berry</ComboBoxItem>
+                <ComboBoxItem>Purple</ComboBoxItem>
                 <ComboBoxItem>Custom…</ComboBoxItem>
               </ComboBox>
               <!-- Custom color swatch: previews/edits PluginSettings.CustomWaveformColor; only

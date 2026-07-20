@@ -17,7 +17,7 @@ namespace QuickLook.Plugin.XdfViewer.Settings
 
         public static WaveformColorTheme WaveformColorTheme
         {
-            get => ParseEnum("WaveformColorTheme", WaveformColorTheme.Berry);
+            get => ParseEnum("WaveformColorTheme", WaveformColorTheme.Purple);
             set => SettingHelper.Set("WaveformColorTheme", value.ToString(), Domain);
         }
 
@@ -55,6 +55,8 @@ namespace QuickLook.Plugin.XdfViewer.Settings
                     return Color.FromRgb(0x59, 0xC9, 0x7A);
                 case WaveformColorTheme.Berry:
                     return Color.FromRgb(0xC8, 0x68, 0xE0);
+                case WaveformColorTheme.Purple:
+                    return Color.FromRgb(0x8A, 0x5C, 0xF6);
                 case WaveformColorTheme.Custom:
                     return CustomWaveformColor;
                 default:

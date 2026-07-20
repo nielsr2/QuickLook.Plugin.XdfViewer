@@ -46,6 +46,12 @@ namespace QuickLook.Plugin.XdfViewer.Tests
         }
 
         [Fact]
+        public void ResolveAccentColor_Purple_MatchesDocumentedRgb()
+        {
+            Assert.Equal(Color.FromRgb(0x8A, 0x5C, 0xF6), PluginSettings.ResolveAccentColor(WaveformColorTheme.Purple));
+        }
+
+        [Fact]
         public void ResolveAccentColor_Custom_ReturnsNonNullColor()
         {
             // Deliberately not asserting an exact color: CustomWaveformColor is backed by
@@ -55,7 +61,7 @@ namespace QuickLook.Plugin.XdfViewer.Tests
         }
 
         [Fact]
-        public void WaveformColorTheme_DeclaresExactlySixValuesInOrder()
+        public void WaveformColorTheme_DeclaresExactlySevenValuesInOrder()
         {
             var expected = new[]
             {
@@ -64,6 +70,7 @@ namespace QuickLook.Plugin.XdfViewer.Tests
                 WaveformColorTheme.Sunset,
                 WaveformColorTheme.Forest,
                 WaveformColorTheme.Berry,
+                WaveformColorTheme.Purple,
                 WaveformColorTheme.Custom
             };
 
