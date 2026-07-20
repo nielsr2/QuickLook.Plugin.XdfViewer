@@ -49,6 +49,17 @@ namespace QuickLook.Plugin.XdfViewer.Tests
         }
 
         [Fact]
+        public void StreamFirstTimestamp_ComesFromStream()
+        {
+            // The full-view marker overlay anchors marker times to this stream's own first timestamp.
+            var channel = new XdfChannel { Label = "Fp1" };
+            var stream = new XdfStream { FirstTimestamp = 123.5, LastTimestamp = 130.0 };
+            var vm = new ChannelViewModel(channel, stream);
+
+            Assert.Equal(123.5, vm.StreamFirstTimestamp);
+        }
+
+        [Fact]
         public void HasWaveform_FalseInitially_NoSparkline()
         {
             var channel = new XdfChannel { Label = "Fp1" };
@@ -159,6 +170,35 @@ namespace QuickLook.Plugin.XdfViewer.Tests
 
             Assert.True(vm.IsExpanded);
             Assert.Contains(nameof(ChannelViewModel.IsExpanded), raised);
+        }
+
+        [Fact]
+        public void IsFilteredOut_SetTrue_RaisesPropertyChanged()
+        {
+            var vm = new ChannelViewModel(new XdfChannel { Label = "Fp1" }, new XdfStream());
+            var raised = CapturePropertyChanges(vm);
+
+            Assert.False(vm.IsFilteredOut);
+            vm.IsFilteredOut = true;
+
+            Assert.True(vm.IsFilteredOut);
+            Assert.Contains(nameof(ChannelViewModel.IsFilteredOut), raised);
+        }
+
+        [Fact]
+        public void StreamCard_NoChannelMatch_DefaultsFalse_RaisesOnSet()
+        {
+            var stream = new XdfStream { ChannelFormat = "float32" };
+            stream.Channels.Add(new XdfChannel { Label = "Fp1" });
+            var card = new StreamCardViewModel(stream);
+            var raised = new List<string>();
+            card.PropertyChanged += (s, e) => raised.Add(e.PropertyName);
+
+            Assert.False(card.NoChannelMatch);
+            card.SetNoChannelMatch(true);
+
+            Assert.True(card.NoChannelMatch);
+            Assert.Contains(nameof(StreamCardViewModel.NoChannelMatch), raised);
         }
 
         [Fact]

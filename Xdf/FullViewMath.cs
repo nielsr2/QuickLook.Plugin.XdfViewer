@@ -54,6 +54,17 @@ namespace QuickLook.Plugin.XdfViewer.Xdf
             return Clamp(newStart, newCount, total, minCount);
         }
 
+        /// <summary>
+        /// The (fractional) sample index under a cursor at fractional x <paramref name="xFrac"/>
+        /// within the viewport (0 = left edge, 1 = right edge). <paramref name="xFrac"/> is clamped
+        /// to [0, 1]. Used by the hover crosshair to read the time under the pointer.
+        /// </summary>
+        public static double SampleAtViewX(double start, double count, double xFrac)
+        {
+            if (xFrac < 0) xFrac = 0; else if (xFrac > 1) xFrac = 1;
+            return start + xFrac * count;
+        }
+
         /// <summary>Shifts the window by <paramref name="deltaSamples"/>, keeping Count and clamping Start.</summary>
         public static ViewWindow Pan(double start, double count, double total, double deltaSamples)
         {

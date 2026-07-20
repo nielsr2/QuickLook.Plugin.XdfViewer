@@ -29,8 +29,36 @@ namespace QuickLook.Plugin.XdfViewer.Tests
         [Fact]
         public void IsMarkerStream_WhenStringFormat()
         {
-            Assert.True(new XdfStream { ChannelFormat = "string" }.IsMarkerStream);
+            Assert.True(new XdfStream { ChannelFormat = "string", NominalSampleRate = 0 }.IsMarkerStream);
             Assert.False(new XdfStream { ChannelFormat = "float32" }.IsMarkerStream);
+        }
+
+        [Fact]
+        public void IsMarkerStream_StringIrregular_True()
+        {
+            var s = new XdfStream { ChannelFormat = "string", NominalSampleRate = 0, Type = "Markers" };
+            Assert.True(s.IsMarkerStream);
+        }
+
+        [Fact]
+        public void IsMarkerStream_VideoCompressedStringIrregular_False()
+        {
+            var s = new XdfStream { ChannelFormat = "string", NominalSampleRate = 0, Type = "VideoCompressed" };
+            Assert.False(s.IsMarkerStream);
+        }
+
+        [Fact]
+        public void IsMarkerStream_StringAtRegularRate_False()
+        {
+            var s = new XdfStream { ChannelFormat = "string", NominalSampleRate = 10000, Type = "sampledMarkers" };
+            Assert.False(s.IsMarkerStream);
+        }
+
+        [Fact]
+        public void IsMarkerStream_NumericIrregular_False()
+        {
+            var s = new XdfStream { ChannelFormat = "float32", NominalSampleRate = 0, Type = "EEG" };
+            Assert.False(s.IsMarkerStream);
         }
 
         [Fact]

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -49,14 +50,41 @@ namespace QuickLook.Plugin.XdfViewer
         private const double DotThresholdPx = 6.0;   // must match FullWave.SampleDotThresholdPx
         private const double Inset = 12.0;           // must match FullWave.VerticalInset
         private const int ReadDebounceMs = 110;
+        private const int MaxMarkerLines = 4000;     // safety cap against pathological event counts
+        private const int MaxMarkerLabels = 60;      // beyond this, Labels mode falls back to lines only
+        private const double MinCardWidth = 320.0;   // narrowest a stream card should get before dropping a column
+
+        /// <summary>Column count for the stream-card grid, recomputed from the available width so the
+        /// cards stretch to fill the preview window. Bound by the ItemsPanel's UniformGrid.</summary>
+        public static readonly DependencyProperty CardColumnsProperty = DependencyProperty.Register(
+            nameof(CardColumns), typeof(int), typeof(XdfPreviewPanel), new PropertyMetadata(1));
+
+        public int CardColumns
+        {
+            get => (int)GetValue(CardColumnsProperty);
+            set => SetValue(CardColumnsProperty, value);
+        }
+
+        // Marker overlay state: the file's events + the display mode (index matches the ComboBox).
+        private readonly List<XdfMarker> _fullMarkers = new List<XdfMarker>();
+        private int _markerMode = 1;                 // 0 = Off, 1 = Lines, 2 = Labels
+
+        // Amber reads clearly over the waveform on both light and dark themes.
+        private static readonly Brush MarkerBrush = Frozen(Color.FromRgb(0xE0, 0x8E, 0x2A));
+        private static readonly Brush MarkerLabelBg = Frozen(Color.FromArgb(0x99, 0, 0, 0));
+        private static Brush Frozen(Color c) { var b = new SolidColorBrush(c); b.Freeze(); return b; }
 
         public XdfPreviewPanel()
         {
             Resources.Add("BoolToVis", new BooleanToVisibilityConverter());
             Resources.Add("InverseBoolToVis", new InverseBooleanToVisibilityConverter());
+            Resources.Add("KindToGeometry", new QuickLook.Plugin.XdfViewer.Resources.StreamKindToGeometryConverter());
             // Opaque backdrop for the full-window overlay so the cards behind it are hidden.
             // Overridden per-theme in ApplyTheme; this dark default covers Themes.None.
             Resources["PanelBackground"] = new SolidColorBrush(Color.FromRgb(0x1E, 0x1E, 0x1E));
+            // Neutral default so the DynamicResource-bound stream-kind icon isn't left unfilled
+            // (and thus invisible) under Themes.None, where ApplyTheme never registers this key.
+            Resources["WaveformBrush"] = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88));
             InitializeComponent();
             // Hook the top-level window so trackpad horizontal scroll (WM_MOUSEHWHEEL, which WPF does
             // not surface as a routed event) can pan the full view.
@@ -116,7 +144,57 @@ namespace QuickLook.Plugin.XdfViewer
             FileNameText.Text = vm.FileName;
             SummaryText.Text = vm.Summary;
             StreamsList.ItemsSource = vm.Streams;
+
+            // Reset the channel-search box and hide it when there are no numeric channels to filter.
+            ChannelSearchBox.Text = "";   // clears any prior filter via TextChanged
+            bool anyChannels = false;
+            foreach (var s in vm.Streams)
+                if (!s.IsMarkerStream && s.Channels.Count > 0) { anyChannels = true; break; }
+            ChannelSearchGrid.Visibility = anyChannels ? Visibility.Visible : Visibility.Collapsed;
+
+            UpdateCardColumns();
             Root.Visibility = Visibility.Visible;
+        }
+
+        private void StreamsList_SizeChanged(object sender, SizeChangedEventArgs e) => UpdateCardColumns();
+
+        /// <summary>Re-fits the card grid to the current width: as many equal columns as fit at
+        /// <see cref="MinCardWidth"/>, never more than there are streams.</summary>
+        private void UpdateCardColumns()
+        {
+            if (StreamsList == null) return;
+            int count = _vm?.Streams?.Count ?? 0;
+            CardColumns = CardLayout.ColumnsForWidth(StreamsList.ActualWidth, MinCardWidth, count);
+        }
+
+        private void ChannelSearchBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            string query = ChannelSearchBox.Text;
+            if (ChannelSearchPlaceholder != null)
+                ChannelSearchPlaceholder.Visibility =
+                    string.IsNullOrEmpty(query) ? Visibility.Visible : Visibility.Collapsed;
+            ApplyChannelSearch(query);
+        }
+
+        /// <summary>Filters channel rows across every numeric stream by label (case-insensitive
+        /// substring via <see cref="ViewModels.ChannelSearch"/>), flagging cards whose channels are
+        /// all filtered out. Marker streams are unaffected.</summary>
+        private void ApplyChannelSearch(string query)
+        {
+            if (_vm == null) return;
+            foreach (var stream in _vm.Streams)
+            {
+                if (stream.IsMarkerStream) continue;
+                int visible = 0;
+                foreach (var ch in stream.Channels)
+                {
+                    bool match = ViewModels.ChannelSearch.Matches(ch.Label, query);
+                    ch.IsFilteredOut = !match;
+                    if (match) visible++;
+                }
+                stream.SetNoChannelMatch(
+                    stream.Channels.Count > 0 && visible == 0 && !string.IsNullOrWhiteSpace(query));
+            }
         }
 
         public void ShowError(string message)
@@ -211,7 +289,19 @@ namespace QuickLook.Plugin.XdfViewer
             _renderedCount = _totalSamples;
             FullWave.Envelope = cvm.FullDetail;
 
+            // Collect the file's events (from every marker stream) for the overlay; hide the mode
+            // selector when there are none.
+            _fullMarkers.Clear();
+            if (_file != null)
+                foreach (var s in _file.Streams)
+                    if (s.IsMarkerStream) _fullMarkers.AddRange(s.Markers);
+            bool hasMarkers = _fullMarkers.Count > 0;
+            MarkerModeLabel.Visibility = MarkerModeCombo.Visibility =
+                hasMarkers ? Visibility.Visible : Visibility.Collapsed;
+
             FullView.Visibility = Visibility.Visible;
+            // Grab keyboard focus once the overlay is laid out, so Esc/Home/End work right away.
+            Dispatcher.BeginInvoke(new Action(() => FullView.Focus()), DispatcherPriority.Input);
             SetView(0, _totalSamples);   // zeroes the window and paints axes/chrome/minimap
 
             if (cvm.FullDetail == null) LoadFullDetail(cvm);   // whole-channel read (also the scaling + minimap source)
@@ -271,13 +361,31 @@ namespace QuickLook.Plugin.XdfViewer
             return sb.ToString();
         }
 
-        private void CloseFullView_Click(object sender, RoutedEventArgs e)
+        private void CloseFullView_Click(object sender, RoutedEventArgs e) => CloseFullView();
+
+        private void CloseFullView()
         {
             _readTimer?.Stop();
             _fullReadSeq++;
+            HideCrosshair();
+            _fullMarkers.Clear();
+            if (MarkerLayer != null) MarkerLayer.Children.Clear();
             FullView.Visibility = Visibility.Collapsed;
             FullView.DataContext = null;
             _fullChannel = null;
+        }
+
+        /// <summary>Keyboard nav for the full view: Esc closes; Home/End jump to the start/end of the
+        /// stream (keeping the current zoom width). Arrow/+/- are intentionally not bound.</summary>
+        private void FullView_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (_fullChannel == null) return;
+            switch (e.Key)
+            {
+                case Key.Escape: CloseFullView(); e.Handled = true; break;
+                case Key.Home: SetView(0, _viewCount); e.Handled = true; break;
+                case Key.End: SetView(_totalSamples - _viewCount, _viewCount); e.Handled = true; break;
+            }
         }
 
         private void GainSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -333,6 +441,68 @@ namespace QuickLook.Plugin.XdfViewer
 
             UpdateMinimap();
             UpdateBadge();
+            UpdateMarkers();
+        }
+
+        private void MarkerModeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (MarkerModeCombo == null) return;
+            _markerMode = MarkerModeCombo.SelectedIndex;   // 0 = Off, 1 = Lines, 2 = Labels
+            UpdateMarkers();
+        }
+
+        /// <summary>Redraws the marker overlay for the visible window. Each event maps
+        /// <c>Timestamp − stream.FirstTimestamp</c> (seconds) to an x via <see cref="MarkerLayout"/>;
+        /// off-window events are skipped. Suppressed entirely when the stream has no first timestamp
+        /// (its timeline zero is unknown), so events are never mis-placed.</summary>
+        private void UpdateMarkers()
+        {
+            if (MarkerLayer == null) return;
+            MarkerLayer.Children.Clear();
+            if (_markerMode == 0 || _fullChannel == null || _fullMarkers.Count == 0) return;
+
+            double firstTs = _fullChannel.StreamFirstTimestamp ?? double.NaN;
+            if (double.IsNaN(firstTs) || _durationSec <= 0 || _totalSamples <= 0) return;
+
+            double vp = ViewportPx;
+            double h = FullWave != null ? FullWave.ActualHeight : 0;
+            if (vp <= 0 || h <= 0) return;
+
+            double startSec = _durationSec * (_viewStart / _totalSamples);
+            double endSec = _durationSec * ((_viewStart + _viewCount) / _totalSamples);
+            bool labels = _markerMode == 2;
+
+            int lines = 0, labelsDrawn = 0;
+            foreach (var m in _fullMarkers)
+            {
+                double x = MarkerLayout.XForSeconds(m.Timestamp - firstTs, startSec, endSec, vp);
+                if (double.IsNaN(x)) continue;
+                if (++lines > MaxMarkerLines) break;
+
+                MarkerLayer.Children.Add(new Line
+                {
+                    X1 = x, X2 = x, Y1 = 0, Y2 = h,
+                    Stroke = MarkerBrush, StrokeThickness = 1, Opacity = 0.75
+                });
+                MarkerLayer.Children.Add(new Polygon
+                {
+                    Fill = MarkerBrush,
+                    Points = new PointCollection { new Point(x - 3, 0), new Point(x + 3, 0), new Point(x, 5) }
+                });
+
+                if (labels && labelsDrawn < MaxMarkerLabels && !string.IsNullOrEmpty(m.Value))
+                {
+                    var tb = new TextBlock
+                    {
+                        Text = m.Value, FontSize = 9, Foreground = MarkerBrush,
+                        Background = MarkerLabelBg, Padding = new Thickness(2, 0, 2, 0)
+                    };
+                    Canvas.SetLeft(tb, x + 3);
+                    Canvas.SetTop(tb, 5);
+                    MarkerLayer.Children.Add(tb);
+                    labelsDrawn++;
+                }
+            }
         }
 
         private void UpdateBadge()
@@ -517,6 +687,15 @@ namespace QuickLook.Plugin.XdfViewer
         private void PlotCell_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (_fullChannel == null) return;
+            FullView.Focus();   // so Esc/Home/End reach the key handler after a click
+
+            if (e.ClickCount == 2)   // double-click resets to fully zoomed out
+            {
+                GainSlider.Value = 1.0;
+                SetView(0, _totalSamples);
+                return;
+            }
+
             _dragging = true;
             _dragAnchorPx = e.GetPosition(FullWave).X;
             _dragAnchorStart = _viewStart;
@@ -526,12 +705,63 @@ namespace QuickLook.Plugin.XdfViewer
 
         private void PlotCell_MouseMove(object sender, MouseEventArgs e)
         {
-            if (!_dragging) return;
+            var p = e.GetPosition(FullWave);
+            if (!_dragging) { UpdateCrosshair(p); return; }
+
+            HideCrosshair();               // no crosshair while panning
             double vp = ViewportPx;
             if (vp <= 0) return;
-            double dxPx = e.GetPosition(FullWave).X - _dragAnchorPx;
+            double dxPx = p.X - _dragAnchorPx;
             double dSamples = -dxPx * (_viewCount / vp);   // drag right -> window moves toward start
             SetView(_dragAnchorStart + dSamples, _viewCount);
+        }
+
+        private void PlotCell_MouseLeave(object sender, MouseEventArgs e) => HideCrosshair();
+
+        private void HideCrosshair()
+        {
+            if (CrosshairLayer != null) CrosshairLayer.Visibility = Visibility.Collapsed;
+        }
+
+        /// <summary>Positions the hover crosshair at <paramref name="p"/> (FullWave coordinates) and
+        /// writes the readout: time (relative to the stream start) plus, when the amplitude scale is
+        /// known, the value under the pointer via the inverse vertical map.</summary>
+        private void UpdateCrosshair(Point p)
+        {
+            if (CrosshairLayer == null || _fullChannel == null) { HideCrosshair(); return; }
+            double vp = ViewportPx;
+            double h = FullWave != null ? FullWave.ActualHeight : 0;
+            if (vp <= 0 || h <= 0 || p.X < 0 || p.X > vp || p.Y < 0 || p.Y > h) { HideCrosshair(); return; }
+
+            CrosshairV.X1 = CrosshairV.X2 = p.X; CrosshairV.Y1 = 0; CrosshairV.Y2 = h;
+            CrosshairH.Y1 = CrosshairH.Y2 = p.Y; CrosshairH.X1 = 0; CrosshairH.X2 = vp;
+
+            double sample = FullViewMath.SampleAtViewX(_viewStart, _viewCount, p.X / vp);
+            double seconds = _totalSamples > 0 ? _durationSec * sample / _totalSamples : 0;
+            string text = Xdf.TimeFormat.FormatClock(seconds);
+
+            var env = _fullChannel.FullDetail;
+            if (env != null && !env.IsEmpty && env.DataMax > env.DataMin)
+            {
+                double center = env.Center;
+                double halfRange = Math.Max(env.DataMax - center, center - env.DataMin);
+                if (halfRange <= 0) halfRange = (env.DataMax - env.DataMin) / 2.0;
+                double gain = FullWave.Gain < 1 ? 1 : FullWave.Gain;
+                double val = Controls.WaveformSparkline.InvMapYInset(p.Y, center, halfRange, h, gain, Inset);
+                text += "   " + FmtAxis(val);
+                if (!string.IsNullOrEmpty(_fullChannel.Unit)) text += " " + _fullChannel.Unit;
+            }
+            CrosshairText.Text = text;
+
+            // Keep the readout chip beside the pointer but inside the plot.
+            CrosshairReadout.Measure(new Size(vp, h));
+            double rw = CrosshairReadout.DesiredSize.Width, rh = CrosshairReadout.DesiredSize.Height;
+            double left = p.X + 10; if (left + rw > vp) left = p.X - 10 - rw; if (left < 0) left = 0;
+            double top = p.Y + 12; if (top + rh > h) top = p.Y - 12 - rh; if (top < 0) top = 0;
+            Canvas.SetLeft(CrosshairReadout, left);
+            Canvas.SetTop(CrosshairReadout, top);
+
+            CrosshairLayer.Visibility = Visibility.Visible;
         }
 
         private void PlotCell_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)

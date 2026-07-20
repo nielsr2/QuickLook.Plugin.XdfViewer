@@ -5,10 +5,9 @@
 
 ## Where things stand
 
-- Feature-complete QuickLook **XDF viewer** plugin. The `feat/channel-waveforms` work is now
-  **merged into `master`** (merge commit `e7fb93b`); `master` is the working branch and the
-  feature branch has been deleted.
-- **170 tests green**, build clean (0 warnings), plugin csproj keeps **zero `PackageReference`**,
+- Feature-complete QuickLook **XDF viewer** plugin. `feat/channel-waveforms` is merged into
+  `master` (merge `e7fb93b`). Current work sits on **`feat/fullview-polish`** (3 commits, unmerged).
+- **198 tests green**, build clean (0 warnings), plugin csproj keeps **zero `PackageReference`**,
   model/view-models stay WPF-free.
 - Packaged as `QuickLook.Plugin.XdfViewer.qlplugin` via `Scripts/pack-zip.ps1` (which now **builds
   Release first**, so it can't ship a stale DLL again).
@@ -29,12 +28,24 @@
 - **Publish essentials**: GPL-3.0 `LICENSE`, GitHub Actions CI (`.github/workflows/build.yml`),
   README Download/License sections, untracked local dev notes.
 
-## In progress — full-view polish + markers/search
+## Built on `feat/fullview-polish` ✔ (2026-07-19)
 
-1. **Full-view polish**: hover **crosshair** with time + amplitude readout; `Esc` to close;
-   arrow/`+`/`-`/`Home`/`End` keyboard shortcuts; double-click to reset zoom-out.
-2. **Marker overlay + channel search**: draw marker-stream **events as vertical lines** on the
-   full-view time axis; a **filter/search box** to find channels in large (144-ch) streams.
+1. **Full-view polish** — hover **crosshair** with a time + amplitude readout (amplitude via the new
+   pure `WaveformSparkline.InvMapYInset`, time via `FullViewMath.SampleAtViewX`); **Esc** closes;
+   **Home/End** jump to the stream start/end keeping zoom width; **double-click** resets to fully
+   zoomed out + gain ×1. *(Arrow and `+`/`-` keys deliberately dropped — wheel & drag already cover
+   zoom/pan.)*
+2. **Marker overlay** — marker-stream events as vertical amber lines + carets on the full-view plot
+   (pure `MarkerLayout.XForSeconds`), with an **Off / Lines / Labels** selector in the settings row
+   (hidden when the file has no events). Anchored to the selected stream's own `FirstTimestamp`;
+   suppressed when that is unknown, so events are never mis-placed. Overlay is non-hit-testable, so
+   wheel/drag/move still reach the plot.
+3. **Channel search** — a header box filters channel rows by label across all cards (pure
+   `ChannelSearch.Matches`). Cards stay in place and show "no matching channels" when everything is
+   filtered out; marker streams are unaffected. Filtering lives in the code-behind and drives two
+   bindable flags, keeping the view-models WPF-free.
+
+Design spec (local, gitignored): `docs/superpowers/specs/2026-07-19-fullview-polish-markers-search-design.md`
 
 ## Needs you (can't be done from here)
 
@@ -79,6 +90,6 @@ Renaming the outer working-copy folder is likewise cosmetic and does not change 
 ```
 # build / test / pack
 dotnet build QuickLook.Plugin.XdfViewer.csproj -c Release
-dotnet test  QuickLook.Plugin.XdfViewer.Tests -c Debug           # 170 tests
+dotnet test  QuickLook.Plugin.XdfViewer.Tests -c Debug           # 198 tests
 pwsh Scripts/pack-zip.ps1 -Configuration Release
 ```

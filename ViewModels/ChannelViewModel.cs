@@ -12,6 +12,7 @@ namespace QuickLook.Plugin.XdfViewer.ViewModels
         private ChannelEnvelope _detail;
         private ChannelEnvelope _fullDetail;
         private bool _isExpanded;
+        private bool _isFilteredOut;
 
         public ChannelViewModel(XdfChannel channel, XdfStream stream, int channelIndex = 0)
         {
@@ -34,6 +35,10 @@ namespace QuickLook.Plugin.XdfViewer.ViewModels
 
         /// <summary>Duration of the owning stream, in seconds (for the expanded time axis).</summary>
         public double? StreamDurationSeconds => _stream.Duration;
+
+        /// <summary>First timestamp of the owning stream (the full view's time-zero; anchors the
+        /// marker overlay). Null when the stream has no timestamps.</summary>
+        public double? StreamFirstTimestamp => _stream.FirstTimestamp;
 
         public ChannelEnvelope Sparkline
         {
@@ -85,6 +90,19 @@ namespace QuickLook.Plugin.XdfViewer.ViewModels
                 if (_isExpanded == value) return;
                 _isExpanded = value;
                 Raise(nameof(IsExpanded));
+            }
+        }
+
+        /// <summary>True when the channel-search box is filtering this channel out of view. Drives the
+        /// row's visibility.</summary>
+        public bool IsFilteredOut
+        {
+            get => _isFilteredOut;
+            set
+            {
+                if (_isFilteredOut == value) return;
+                _isFilteredOut = value;
+                Raise(nameof(IsFilteredOut));
             }
         }
 

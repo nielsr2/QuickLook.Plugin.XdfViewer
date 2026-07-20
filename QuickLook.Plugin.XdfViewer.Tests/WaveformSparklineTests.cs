@@ -141,6 +141,54 @@ namespace QuickLook.Plugin.XdfViewer.Tests
                          WaveformSparkline.MapYInset(3d, 5d, 5d, 100d, 1d, 0d), 9);
         }
 
+        // --- Amplitude inverse (pixel Y -> data value, for the hover crosshair readout) ---
+
+        [Fact]
+        public void InvMapYInset_TopInset_IsMaxVisibleValue()
+        {
+            // center 5, halfRange 5, height 100, gain 1, inset 10 => band [10, 90].
+            // The top of the band (y=inset) reads the top visible value center+halfRange = 10.
+            Assert.Equal(10d, WaveformSparkline.InvMapYInset(10d, 5d, 5d, 100d, 1d, 10d), 9);
+        }
+
+        [Fact]
+        public void InvMapYInset_BottomInset_IsMinVisibleValue()
+        {
+            Assert.Equal(0d, WaveformSparkline.InvMapYInset(90d, 5d, 5d, 100d, 1d, 10d), 9);
+        }
+
+        [Fact]
+        public void InvMapYInset_MidHeight_IsCenter()
+        {
+            Assert.Equal(5d, WaveformSparkline.InvMapYInset(50d, 5d, 5d, 100d, 1d, 10d), 9);
+        }
+
+        [Fact]
+        public void InvMapYInset_RoundTripsWithMapYInset()
+        {
+            // Inverting the forward map recovers the original value (within the visible band).
+            const double center = 5d, halfRange = 5d, height = 100d, gain = 1d, inset = 10d;
+            foreach (double v in new[] { 1d, 3d, 5d, 7.5d, 9d })
+            {
+                double y = WaveformSparkline.MapYInset(v, center, halfRange, height, gain, inset);
+                Assert.Equal(v, WaveformSparkline.InvMapYInset(y, center, halfRange, height, gain, inset), 6);
+            }
+        }
+
+        [Fact]
+        public void InvMapYInset_Gain2_HalvesTheVisibleHalfRange()
+        {
+            // gain 2 => visible half-range is halfRange/2 = 2.5, so the top of the band reads center+2.5.
+            Assert.Equal(7.5d, WaveformSparkline.InvMapYInset(10d, 5d, 5d, 100d, 2d, 10d), 9);
+        }
+
+        [Fact]
+        public void InvMapYInset_FlatRange_ReturnsCenter()
+        {
+            // A flat channel has no invertible amplitude; the readout is just the constant value.
+            Assert.Equal(5d, WaveformSparkline.InvMapYInset(30d, 5d, 0d, 100d, 1d, 10d), 9);
+        }
+
         // --- Sample-dot mode decision (zoomed to ~>=1 sample/bucket) ---
 
         [Fact]
