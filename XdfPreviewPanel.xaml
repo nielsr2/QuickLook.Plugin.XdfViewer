@@ -11,6 +11,12 @@
                VerticalAlignment="Center" HorizontalAlignment="Center" Opacity="0.8"/>
     <DockPanel x:Name="Root" Visibility="Collapsed">
       <DockPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+        <!-- Settings (upper-right-most): gear opens the plugin settings popup (waveform color
+             theme, etc.). Popup content/wiring lives in Settings/ + code-behind. -->
+        <ToggleButton x:Name="SettingsButton" DockPanel.Dock="Right" Width="28" Height="28"
+                      Margin="8,0,0,0" VerticalAlignment="Top" Padding="0"
+                      Content="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                      ToolTip="Settings"/>
         <!-- Channel search (upper right): filters channel rows by label across all stream cards. -->
         <Grid x:Name="ChannelSearchGrid" DockPanel.Dock="Right" Width="220"
               VerticalAlignment="Top" Margin="12,0,0,0">
