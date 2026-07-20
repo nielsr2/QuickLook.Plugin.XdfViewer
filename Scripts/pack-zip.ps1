@@ -35,10 +35,16 @@ $xml.Save($metaConfig)
 
 # Package = plugin DLL + the generated metadata config. (QuickLook.Common is provided
 # by the host at runtime, so it is intentionally NOT bundled.)
+# Compress-Archive on PowerShell 7+ rejects a non-.zip -DestinationPath, so zip to a
+# temp .zip first and rename — Windows PowerShell 5.1 (used locally) allows either,
+# but pwsh 7 (GitHub's windows-latest runner) does not.
 if (Test-Path $target) { Remove-Item $target }
+$tempZip = Join-Path $projDir "QuickLook.Plugin.XdfViewer.zip"
+if (Test-Path $tempZip) { Remove-Item $tempZip }
 $include = @(
   (Join-Path $OutDir "QuickLook.Plugin.XdfViewer.dll"),
   $metaConfig
 )
-Compress-Archive -Path $include -DestinationPath $target
+Compress-Archive -Path $include -DestinationPath $tempZip
+Move-Item $tempZip $target
 Write-Host "Packed $target (metadata Namespace=QuickLook.Plugin.XdfViewer, Version=$($xml.Metadata.Version))"
