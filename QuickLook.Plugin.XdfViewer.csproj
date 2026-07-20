@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>net462</TargetFramework>
     <UseWPF>true</UseWPF>
-    <UseWindowsForms>false</UseWindowsForms>
+    <UseWindowsForms>true</UseWindowsForms>
     <LangVersion>latest</LangVersion>
     <Platforms>AnyCPU;x64</Platforms>
     <RootNamespace>QuickLook.Plugin.XdfViewer</RootNamespace>

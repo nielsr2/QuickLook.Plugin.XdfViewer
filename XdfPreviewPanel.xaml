@@ -17,6 +17,34 @@
                       Margin="8,0,0,0" VerticalAlignment="Top" Padding="0"
                       Content="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="14"
                       ToolTip="Settings"/>
+        <Popup PlacementTarget="{Binding ElementName=SettingsButton}" Placement="Bottom"
+               StaysOpen="False" AllowsTransparency="True"
+               IsOpen="{Binding IsChecked, ElementName=SettingsButton, Mode=TwoWay}">
+          <Border Background="{DynamicResource PanelBackground}" BorderBrush="#55888888"
+                  BorderThickness="1" Padding="12" CornerRadius="6" Margin="0,4,10,10">
+            <Border.Effect>
+              <DropShadowEffect Color="#000000" BlurRadius="10" ShadowDepth="2" Opacity="0.5"/>
+            </Border.Effect>
+            <StackPanel>
+              <TextBlock Text="WAVEFORM COLOR" FontSize="10" Opacity="0.6" Margin="0,0,0,6"/>
+              <!-- Item order MUST exactly match the WaveformColorTheme enum declaration order
+                   (Mono, Ocean, Sunset, Forest, Berry, Custom): SelectedIndex is cast straight
+                   to the enum in code-behind. -->
+              <ComboBox x:Name="WaveformThemeCombo" Width="160" SelectionChanged="WaveformThemeCombo_SelectionChanged">
+                <ComboBoxItem>Mono</ComboBoxItem>
+                <ComboBoxItem>Ocean</ComboBoxItem>
+                <ComboBoxItem>Sunset</ComboBoxItem>
+                <ComboBoxItem>Forest</ComboBoxItem>
+                <ComboBoxItem>Berry</ComboBoxItem>
+                <ComboBoxItem>Custom…</ComboBoxItem>
+              </ComboBox>
+              <!-- Custom color swatch: previews/edits PluginSettings.CustomWaveformColor; only
+                   shown when the Custom theme is selected. -->
+              <Button x:Name="CustomColorSwatch" Click="CustomColorSwatch_Click" Margin="0,8,0,0"
+                      Height="24" HorizontalAlignment="Stretch" Visibility="Collapsed"/>
+            </StackPanel>
+          </Border>
+        </Popup>
         <!-- Channel search (upper right): filters channel rows by label across all stream cards. -->
         <Grid x:Name="ChannelSearchGrid" DockPanel.Dock="Right" Width="220"
               VerticalAlignment="Top" Margin="12,0,0,0">

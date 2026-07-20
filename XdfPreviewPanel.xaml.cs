@@ -13,6 +13,7 @@ using System.Windows.Threading;
 using QuickLook.Plugin.XdfViewer.Xdf;
 using QuickLook.Plugin.XdfViewer.Xdf.Model;
 using QuickLook.Plugin.XdfViewer.ViewModels;
+using QuickLook.Plugin.XdfViewer.Settings;
 
 namespace QuickLook.Plugin.XdfViewer
 {
@@ -74,6 +75,13 @@ namespace QuickLook.Plugin.XdfViewer
         private static readonly Brush MarkerLabelBg = Frozen(Color.FromArgb(0x99, 0, 0, 0));
         private static Brush Frozen(Color c) { var b = new SolidColorBrush(c); b.Freeze(); return b; }
 
+        // Last theme passed to ApplyTheme, so a color-theme change can re-derive WaveformBrush
+        // without the caller having to know/re-pass the current light/dark theme.
+        private QuickLook.Common.Plugin.Themes _currentTheme = QuickLook.Common.Plugin.Themes.None;
+        // Guards the settings controls (WaveformThemeCombo) against firing their SelectionChanged
+        // handler destructively while their initial values are being set from PluginSettings.
+        private bool _initializingSettings;
+
         public XdfPreviewPanel()
         {
             Resources.Add("BoolToVis", new BooleanToVisibilityConverter());
@@ -86,10 +94,67 @@ namespace QuickLook.Plugin.XdfViewer
             // (and thus invisible) under Themes.None, where ApplyTheme never registers this key.
             Resources["WaveformBrush"] = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88));
             InitializeComponent();
+            InitSettingsControls();
             // Hook the top-level window so trackpad horizontal scroll (WM_MOUSEHWHEEL, which WPF does
             // not surface as a routed event) can pan the full view.
             Loaded += OnPanelLoaded;
             Unloaded += OnPanelUnloaded;
+        }
+
+        /// <summary>One-time init of the settings popup controls from the persisted PluginSettings,
+        /// guarded by <see cref="_initializingSettings"/> so setting SelectedIndex here doesn't
+        /// immediately re-save the value it was just loaded from (or trigger a theme refresh before
+        /// ApplyTheme has run for the first time).</summary>
+        private void InitSettingsControls()
+        {
+            _initializingSettings = true;
+            WaveformThemeCombo.SelectedIndex = (int)PluginSettings.WaveformColorTheme;
+            UpdateCustomColorSwatch();
+            _initializingSettings = false;
+        }
+
+        private void WaveformThemeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_initializingSettings || WaveformThemeCombo.SelectedIndex < 0) return;
+            PluginSettings.WaveformColorTheme = (WaveformColorTheme)WaveformThemeCombo.SelectedIndex;
+            UpdateCustomColorSwatch();
+            ApplyTheme(_currentTheme);
+        }
+
+        /// <summary>Shows/hides the custom-color swatch button and paints it to preview the current
+        /// custom color, whether or not Custom is the active theme.</summary>
+        private void UpdateCustomColorSwatch()
+        {
+            if (CustomColorSwatch == null) return;
+            bool isCustom = PluginSettings.WaveformColorTheme == WaveformColorTheme.Custom;
+            CustomColorSwatch.Visibility = isCustom ? Visibility.Visible : Visibility.Collapsed;
+            var c = PluginSettings.CustomWaveformColor;
+            CustomColorSwatch.Background = new SolidColorBrush(c);
+            CustomColorSwatch.Content = "#" + c.R.ToString("X2") + c.G.ToString("X2") + c.B.ToString("X2");
+            CustomColorSwatch.Foreground = new SolidColorBrush(PerceivedBrightness(c) > 0.5
+                ? Color.FromRgb(0, 0, 0) : Color.FromRgb(0xFF, 0xFF, 0xFF));
+        }
+
+        // Simple perceived-brightness estimate (0..1) so the swatch's own label stays legible
+        // against whatever custom color the user picks.
+        private static double PerceivedBrightness(Color c)
+            => (0.299 * c.R + 0.587 * c.G + 0.114 * c.B) / 255.0;
+
+        private void CustomColorSwatch_Click(object sender, RoutedEventArgs e)
+        {
+            var current = PluginSettings.CustomWaveformColor;
+            using (var dlg = new System.Windows.Forms.ColorDialog
+            {
+                Color = System.Drawing.Color.FromArgb(current.A, current.R, current.G, current.B),
+                FullOpen = true
+            })
+            {
+                if (dlg.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
+                var picked = dlg.Color;
+                PluginSettings.CustomWaveformColor = Color.FromArgb(picked.A, picked.R, picked.G, picked.B);
+                UpdateCustomColorSwatch();
+                ApplyTheme(_currentTheme);
+            }
         }
 
         private HwndSource _hwndSource;
@@ -872,27 +937,39 @@ namespace QuickLook.Plugin.XdfViewer
 
         public void ApplyTheme(QuickLook.Common.Plugin.Themes theme)
         {
-            // Set an explicit foreground so text stays readable regardless of the host chrome,
-            // and mirror it into a WaveformBrush resource so sparklines (DynamicResource-bound
-            // LineBrush) stay legible on both themes too. Cards/gray accents (#888) are
-            // theme-neutral and unaffected.
+            _currentTheme = theme;   // remembered so a later color-theme change can re-derive WaveformBrush
+
+            // Set an explicit foreground so text stays readable regardless of the host chrome.
+            // WaveformBrush is derived separately below: Foreground (plain text legibility) must
+            // never be affected by the waveform color-theme choice.
             if (theme == QuickLook.Common.Plugin.Themes.Dark)
             {
-                var brush = new SolidColorBrush(Color.FromRgb(0xEC, 0xEC, 0xEC));
-                Foreground = brush;
-                Resources["WaveformBrush"] = brush;
+                var neutral = new SolidColorBrush(Color.FromRgb(0xEC, 0xEC, 0xEC));
+                Foreground = neutral;
+                Resources["WaveformBrush"] = ResolveWaveformBrush(neutral);
                 Resources["PanelBackground"] = new SolidColorBrush(Color.FromRgb(0x1E, 0x1E, 0x1E));
             }
             else if (theme == QuickLook.Common.Plugin.Themes.Light)
             {
-                var brush = new SolidColorBrush(Color.FromRgb(0x1A, 0x1A, 0x1A));
-                Foreground = brush;
-                Resources["WaveformBrush"] = brush;
+                var neutral = new SolidColorBrush(Color.FromRgb(0x1A, 0x1A, 0x1A));
+                Foreground = neutral;
+                Resources["WaveformBrush"] = ResolveWaveformBrush(neutral);
                 Resources["PanelBackground"] = new SolidColorBrush(Color.FromRgb(0xF5, 0xF5, 0xF5));
             }
             // Themes.None: leave the inherited default (Foreground unset, and sparklines fall
             // back to WaveformSparkline's own built-in default brush since WaveformBrush is
-            // never registered as a resource in that case).
+            // never registered as a resource in that case). A color-theme change while still in
+            // Themes.None is a no-op here on purpose — there is no neutral brush to fall back to
+            // yet, and the real theme will be applied (and WaveformBrush (re)computed) shortly
+            // after via Plugin.cs's call to ApplyTheme(context.Theme).
+        }
+
+        /// <summary>Mono reproduces today's exact behavior (accent == neutral foreground); the other
+        /// themes override the accent color regardless of light/dark.</summary>
+        private static Brush ResolveWaveformBrush(SolidColorBrush neutral)
+        {
+            var accent = PluginSettings.ResolveAccentColor(PluginSettings.WaveformColorTheme);
+            return accent.HasValue ? new SolidColorBrush(accent.Value) : neutral;
         }
     }
 
