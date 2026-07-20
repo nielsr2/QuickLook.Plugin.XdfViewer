@@ -10,6 +10,10 @@ on:
 jobs:
   build:
     runs-on: windows-latest   # WPF / .NET Framework 4.6.2 needs a Windows runner
+    # New repos default GITHUB_TOKEN to read-only; the tag-triggered release step below needs
+    # write access to create a Release and upload the .qlplugin asset to it.
+    permissions:
+      contents: write
     steps:
       - name: Checkout (with QuickLook.Common submodule)
         uses: actions/checkout@v4
