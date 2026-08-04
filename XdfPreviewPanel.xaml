@@ -175,7 +175,13 @@
                                       Converter={StaticResource BoolToVis}}">
                         <ItemsControl.Template>
                           <ControlTemplate>
-                            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,0,14,0">
+                            <!-- Horizontal scrolling makes the ScrollViewer measure its content at natural
+                                 width instead of clamping it to the viewport, so long event values (routinely
+                                 60+ chars in PsychoPy/LabRecorder files) become reachable rather than clipped.
+                                 Both padding gutters reserve room for the thumbs, which QuickLook's scrollbar
+                                 style paints over the content instead of in their own row/column. -->
+                            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Auto" Padding="0,0,14,14">
                               <ItemsPresenter/>
                             </ScrollViewer>
                           </ControlTemplate>
