@@ -270,6 +270,52 @@
                        TextTrimming="CharacterEllipsis"/>
           </StackPanel>
         </DockPanel>
+        <!-- Events panel (right edge, collapsible): the file's whole event list, click to centre the
+             plot on an event at the current zoom. Collapsed by default so the plot keeps full width;
+             the toggle strip stays visible in both states. The whole block hides for marker-free files. -->
+        <Grid x:Name="EventsPanel" DockPanel.Dock="Right" Margin="8,0,0,0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="Auto"/>
+          </Grid.ColumnDefinitions>
+          <ToggleButton x:Name="EventsToggle" Grid.Column="0" Width="22" Padding="0"
+                        VerticalAlignment="Top" Background="Transparent" BorderThickness="0"
+                        Cursor="Hand" ToolTip="Show/hide the event list"
+                        Checked="EventsToggle_Toggled" Unchecked="EventsToggle_Toggled">
+            <StackPanel>
+              <TextBlock x:Name="EventsChevron" Text="&#x2039;" FontSize="14"
+                         HorizontalAlignment="Center"
+                         Foreground="{DynamicResource WaveformBrush}"/>
+              <TextBlock Text="EVENTS" FontSize="10" Opacity="0.6" Margin="0,6,0,0">
+                <TextBlock.LayoutTransform>
+                  <RotateTransform Angle="90"/>
+                </TextBlock.LayoutTransform>
+              </TextBlock>
+            </StackPanel>
+          </ToggleButton>
+          <DockPanel Grid.Column="1" Width="260" Margin="4,0,0,0"
+                     Visibility="{Binding IsChecked, ElementName=EventsToggle,
+                                  Converter={StaticResource BoolToVis}}">
+            <TextBlock x:Name="EventsPanelHeader" DockPanel.Dock="Top" Opacity="0.6"
+                       FontSize="11" Margin="0,0,0,4"/>
+            <ListBox x:Name="EventsList" Background="Transparent" BorderThickness="0"
+                     ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                     ScrollViewer.CanContentScroll="True"
+                     VirtualizingStackPanel.IsVirtualizing="True"
+                     SelectionChanged="EventsList_SelectionChanged">
+              <ListBox.ItemTemplate>
+                <DataTemplate>
+                  <TextBlock Opacity="0.85" FontSize="11">
+                    <Run Text="{Binding TimeLabel, Mode=OneWay}" Foreground="#888"/>
+                    <Run Text="  "/>
+                    <Run Text="{Binding Value, Mode=OneWay}"/>
+                  </TextBlock>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </DockPanel>
+        </Grid>
         <!-- Plot: fixed amplitude axis (left) + waveform (fills), time axis + scrollbar below -->
         <Grid>
           <Grid.ColumnDefinitions>

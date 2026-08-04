@@ -79,6 +79,11 @@ namespace QuickLook.Plugin.XdfViewer
         private readonly List<XdfMarker> _fullMarkers = new List<XdfMarker>();
         private int _markerMode = 2;                 // 0 = Off, 1 = Lines, 2 = Labels
 
+        // Events panel (full view): the same markers as the overlay, as clickable rows. Rebuilt per
+        // focused channel because the times are relative to that channel's stream first timestamp.
+        private readonly List<MarkerViewModel> _fullMarkerVms = new List<MarkerViewModel>();
+        private bool _navigatingToEvent;             // re-entrancy guard while clearing SelectedItem
+
         // Amber reads clearly over the waveform on both light and dark themes.
         private static readonly Brush MarkerBrush = Frozen(Color.FromRgb(0xE0, 0x8E, 0x2A));
         private static readonly Brush MarkerLabelBg = Frozen(Color.FromArgb(0x99, 0, 0, 0));
@@ -375,6 +380,16 @@ namespace QuickLook.Plugin.XdfViewer
             MarkerModeLabel.Visibility = MarkerModeCombo.Visibility =
                 hasMarkers ? Visibility.Visible : Visibility.Collapsed;
 
+            // Events panel rows, on the focused channel's own time basis (null start makes the view
+            // model fall back to raw timestamps, exactly as the overview card does).
+            _fullMarkerVms.Clear();
+            foreach (var m in _fullMarkers)
+                _fullMarkerVms.Add(new MarkerViewModel(m, cvm.StreamFirstTimestamp));
+            EventsList.ItemsSource = null;            // force a rebind; the list instance is reused
+            EventsList.ItemsSource = _fullMarkerVms;
+            EventsPanelHeader.Text = _fullMarkerVms.Count + " events";
+            EventsPanel.Visibility = hasMarkers ? Visibility.Visible : Visibility.Collapsed;
+
             FullView.Visibility = Visibility.Visible;
             // Grab keyboard focus once the overlay is laid out, so Esc/Home/End work right away.
             Dispatcher.BeginInvoke(new Action(() => FullView.Focus()), DispatcherPriority.Input);
@@ -445,6 +460,8 @@ namespace QuickLook.Plugin.XdfViewer
             _fullReadSeq++;
             HideCrosshair();
             _fullMarkers.Clear();
+            _fullMarkerVms.Clear();
+            if (EventsList != null) EventsList.ItemsSource = null;
             if (MarkerLayer != null) MarkerLayer.Children.Clear();
             FullView.Visibility = Visibility.Collapsed;
             FullView.DataContext = null;
@@ -525,6 +542,37 @@ namespace QuickLook.Plugin.XdfViewer
             if (MarkerModeCombo == null) return;
             _markerMode = MarkerModeCombo.SelectedIndex;   // 0 = Off, 1 = Lines, 2 = Labels
             UpdateMarkers();
+        }
+
+        private void EventsToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (EventsChevron == null) return;
+            // Expanding pushes the strip left; collapsing lets it slide back to the right edge.
+            // U+203A = right chevron, U+2039 = left chevron. Escaped rather than pasted because the
+            // two glyphs are near-indistinguishable in source.
+            EventsChevron.Text = EventsToggle.IsChecked == true ? "\u203A" : "\u2039";
+        }
+
+        /// <summary>Click an event: centre the plot on it, keeping the current zoom. Selection is reset
+        /// immediately so clicking the same row twice navigates again (SelectionChanged does not fire
+        /// for a re-click of the selected item) and no row is left highlighted.</summary>
+        private void EventsList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_navigatingToEvent) return;
+            var mvm = EventsList.SelectedItem as MarkerViewModel;
+            if (mvm == null) return;
+
+            _navigatingToEvent = true;
+            try { EventsList.SelectedItem = null; }
+            finally { _navigatingToEvent = false; }
+
+            // Without a stream zero or a duration, seconds cannot be mapped to samples. The overlay
+            // suppresses itself in the same case, so this stays a no-op rather than mis-seeking.
+            if (_fullChannel?.StreamFirstTimestamp == null || _durationSec <= 0 || _totalSamples <= 0) return;
+
+            double sample = _totalSamples * (mvm.RelativeSeconds / _durationSec);
+            var w = FullViewMath.CenterOn(sample, _viewCount, _totalSamples);
+            SetView(w.Start, _viewCount);
         }
 
         /// <summary>Redraws the marker overlay for the visible window. Each event maps
