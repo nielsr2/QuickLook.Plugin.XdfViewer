@@ -116,5 +116,55 @@ namespace QuickLook.Plugin.XdfViewer.Tests
         {
             Assert.Equal(300, FullViewMath.SampleAtViewX(start: 200, count: 100, xFrac: 1.4), P);
         }
+
+        [Fact]
+        public void CenterOn_MidStream_CentresExactly()
+        {
+            var w = FullViewMath.CenterOn(sample: 500, count: 100, total: 1000);
+            Assert.Equal(450, w.Start, P);
+            Assert.Equal(100, w.Count, P);
+        }
+
+        [Fact]
+        public void CenterOn_NearStart_ClampsToZero()
+        {
+            var w = FullViewMath.CenterOn(sample: 10, count: 100, total: 1000);
+            Assert.Equal(0, w.Start, P);
+            Assert.Equal(100, w.Count, P);
+        }
+
+        [Fact]
+        public void CenterOn_NearEnd_ClampsToTheLastWindow()
+        {
+            var w = FullViewMath.CenterOn(sample: 990, count: 100, total: 1000);
+            Assert.Equal(900, w.Start, P);
+            Assert.Equal(100, w.Count, P);
+        }
+
+        [Fact]
+        public void CenterOn_CountAtLeastTotal_StartsAtZero()
+        {
+            var w = FullViewMath.CenterOn(sample: 500, count: 4000, total: 1000);
+            Assert.Equal(0, w.Start, P);
+            Assert.Equal(1000, w.Count, P);
+        }
+
+        [Fact]
+        public void CenterOn_NoSamples_IsAnEmptyWindow()
+        {
+            var w = FullViewMath.CenterOn(sample: 5, count: 100, total: 0);
+            Assert.Equal(0, w.Start, P);
+            Assert.Equal(0, w.Count, P);
+        }
+
+        [Fact]
+        public void CenterOn_NaNSample_YieldsNaNStart_SoCallersMustGuard()
+        {
+            // Clamp's comparisons are all false for NaN, so NaN passes straight through. This is
+            // why SetView and the events-panel click handler guard against non-finite values:
+            // FullScrollBar.Value (a RangeBase) throws ArgumentException on NaN.
+            var w = FullViewMath.CenterOn(double.NaN, count: 100, total: 1000);
+            Assert.True(double.IsNaN(w.Start));
+        }
     }
 }

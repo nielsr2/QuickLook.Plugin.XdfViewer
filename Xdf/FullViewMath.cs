@@ -75,5 +75,16 @@ namespace QuickLook.Plugin.XdfViewer.Xdf
             if (newStart > maxStart) newStart = maxStart;
             return new ViewWindow(newStart, count);
         }
+
+        /// <summary>
+        /// Centres the window on <paramref name="sample"/>, keeping Count and clamping Start — so an
+        /// event near either end of the stream lands off-centre rather than scrolling past the edge.
+        /// Used by the full view's events panel, which must not change the user's zoom level.
+        /// </summary>
+        public static ViewWindow CenterOn(double sample, double count, double total)
+        {
+            if (total <= 0) return new ViewWindow(0, 0);
+            return Clamp(sample - count / 2.0, count, total, 1);
+        }
     }
 }

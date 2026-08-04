@@ -52,7 +52,16 @@ namespace QuickLook.Plugin.XdfViewer
         private const double Inset = 12.0;           // must match FullWave.VerticalInset
         private const int ReadDebounceMs = 110;
         private const int MaxMarkerLines = 4000;     // safety cap against pathological event counts
-        private const int MaxMarkerLabels = 60;      // beyond this, Labels mode falls back to lines only
+        // Measurement budget, not a placement budget: bounds how many in-window candidates get built
+        // and measured per frame. How many are actually drawn is bounded by collision-skip in
+        // MarkerLabelLayout.Place — a 3-row viewport physically holds only ~150 non-overlapping labels,
+        // so at 1000 this cap cannot bind before geometry does.
+        private const int MaxMarkerLabels = 1000;
+        private const int LabelRows = 3;             // stagger rows, filled top-first
+        private const double LabelRowHeightPx = 13;  // 9px font + leading
+        private const double LabelTopPx = 5;         // row 0's y, just under the arrow heads
+        private const double LabelGapPx = 6;         // minimum clearance between labels sharing a row
+        private const int MaxLabelChars = 28;        // one huge value must not starve a whole row
         private const double MinCardWidth = 320.0;   // narrowest a stream card should get before dropping a column
 
         /// <summary>Column count for the stream-card grid, recomputed from the available width so the
@@ -68,7 +77,12 @@ namespace QuickLook.Plugin.XdfViewer
 
         // Marker overlay state: the file's events + the display mode (index matches the ComboBox).
         private readonly List<XdfMarker> _fullMarkers = new List<XdfMarker>();
-        private int _markerMode = 1;                 // 0 = Off, 1 = Lines, 2 = Labels
+        private int _markerMode = 2;                 // 0 = Off, 1 = Lines, 2 = Labels
+
+        // Events panel (full view): the same markers as the overlay, as clickable rows. Rebuilt per
+        // focused channel because the times are relative to that channel's stream first timestamp.
+        private readonly List<MarkerViewModel> _fullMarkerVms = new List<MarkerViewModel>();
+        private bool _navigatingToEvent;             // re-entrancy guard while clearing SelectedItem
 
         // Amber reads clearly over the waveform on both light and dark themes.
         private static readonly Brush MarkerBrush = Frozen(Color.FromRgb(0xE0, 0x8E, 0x2A));
@@ -359,9 +373,39 @@ namespace QuickLook.Plugin.XdfViewer
             if (_file != null)
                 foreach (var s in _file.Streams)
                     if (s.IsMarkerStream) _fullMarkers.AddRange(s.Markers);
+            // Chronological across streams. A file with two marker streams concatenates out of order,
+            // and the label layout is a single left-to-right pass that mis-skips on unordered input.
+            _fullMarkers.Sort((a, b) => a.Timestamp.CompareTo(b.Timestamp));
             bool hasMarkers = _fullMarkers.Count > 0;
             MarkerModeLabel.Visibility = MarkerModeCombo.Visibility =
                 hasMarkers ? Visibility.Visible : Visibility.Collapsed;
+
+            // Events panel rows, on the focused channel's own time basis (null start makes the view
+            // model fall back to raw timestamps, exactly as the overview card does).
+            _fullMarkerVms.Clear();
+            foreach (var m in _fullMarkers)
+                _fullMarkerVms.Add(new MarkerViewModel(m, cvm.StreamFirstTimestamp));
+            EventsList.ItemsSource = null;            // force a rebind; the list instance is reused
+            EventsList.ItemsSource = _fullMarkerVms;
+
+            // Mirror StreamCardViewModel's "500+ events" so a truncated read is never presented as
+            // complete, and singularize so a lone event doesn't read as "1 events".
+            bool truncated = false;
+            if (_file != null)
+                foreach (var s in _file.Streams)
+                    if (s.IsMarkerStream && s.MarkersTruncated) { truncated = true; break; }
+            int shownCount = _fullMarkerVms.Count;
+            string countText = shownCount + (truncated ? "+" : "");
+            EventsPanelHeader.Text = countText + (shownCount == 1 && !truncated ? " event" : " events");
+
+            // The panel is meaningless without a usable time zero: with none, every row falls back to
+            // the raw absolute LSL clock (near-identical, unreadable values) and every click is a
+            // silent no-op via the guard in EventsList_SelectionChanged. Mirrors UpdateMarkers' own
+            // suppression for the same reason — a visible-but-inert panel was rejected; the overview
+            // card (file-wide recording start) remains the place to read those events instead.
+            double panelZero = cvm.StreamFirstTimestamp ?? double.NaN;
+            bool canSeek = !double.IsNaN(panelZero);
+            EventsPanel.Visibility = hasMarkers && canSeek ? Visibility.Visible : Visibility.Collapsed;
 
             FullView.Visibility = Visibility.Visible;
             // Grab keyboard focus once the overlay is laid out, so Esc/Home/End work right away.
@@ -433,6 +477,8 @@ namespace QuickLook.Plugin.XdfViewer
             _fullReadSeq++;
             HideCrosshair();
             _fullMarkers.Clear();
+            _fullMarkerVms.Clear();
+            if (EventsList != null) EventsList.ItemsSource = null;
             if (MarkerLayer != null) MarkerLayer.Children.Clear();
             FullView.Visibility = Visibility.Collapsed;
             FullView.DataContext = null;
@@ -466,6 +512,13 @@ namespace QuickLook.Plugin.XdfViewer
         private void SetView(double start, double count)
         {
             if (_fullChannel == null || _totalSamples <= 0) return;
+            // FullScrollBar.Value (a RangeBase) throws ArgumentException on NaN/Infinity, so a
+            // non-finite window here would crash the host preview rather than merely look wrong.
+            // The events panel's click handler is the one caller that can reach this with a NaN
+            // sample (a marker with no explicit timestamp); reject non-finite input defensively
+            // for every caller since this is the single choke point.
+            if (double.IsNaN(start) || double.IsNaN(count) ||
+                double.IsInfinity(start) || double.IsInfinity(count)) return;
 
             var w = FullViewMath.Clamp(start, count, _totalSamples, MinViewCount);
             _viewStart = w.Start;
@@ -515,10 +568,51 @@ namespace QuickLook.Plugin.XdfViewer
             UpdateMarkers();
         }
 
-        /// <summary>Redraws the marker overlay for the visible window. Each event maps
-        /// <c>Timestamp − stream.FirstTimestamp</c> (seconds) to an x via <see cref="MarkerLayout"/>;
-        /// off-window events are skipped. Suppressed entirely when the stream has no first timestamp
-        /// (its timeline zero is unknown), so events are never mis-placed.</summary>
+        private void EventsToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (EventsChevron == null) return;
+            // Expanding pushes the strip left; collapsing lets it slide back to the right edge.
+            // U+203A = right chevron, U+2039 = left chevron. Escaped rather than pasted because the
+            // two glyphs are near-indistinguishable in source.
+            EventsChevron.Text = EventsToggle.IsChecked == true ? "\u203A" : "\u2039";
+        }
+
+        /// <summary>Click an event: centre the plot on it, keeping the current zoom. Selection is reset
+        /// immediately so clicking the same row twice navigates again (SelectionChanged does not fire
+        /// for a re-click of the selected item) and no row is left highlighted.</summary>
+        private void EventsList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_navigatingToEvent) return;
+            var mvm = EventsList.SelectedItem as MarkerViewModel;
+            if (mvm == null) return;
+
+            _navigatingToEvent = true;
+            try { EventsList.SelectedItem = null; }
+            finally { _navigatingToEvent = false; }
+
+            // Without a stream zero or a duration, seconds cannot be mapped to samples. The overlay
+            // suppresses itself in the same case, so this stays a no-op rather than mis-seeking.
+            if (_fullChannel?.StreamFirstTimestamp == null || _durationSec <= 0 || _totalSamples <= 0) return;
+
+            double sample = _totalSamples * (mvm.RelativeSeconds / _durationSec);
+            // A marker with no explicit 8-byte timestamp reads as NaN (renders as a "?" row) and
+            // survives to here as a NaN RelativeSeconds; CenterOn does not sanitize it, so guard here.
+            if (double.IsNaN(sample)) return;
+            var w = FullViewMath.CenterOn(sample, _viewCount, _totalSamples);
+            SetView(w.Start, _viewCount);
+        }
+
+        /// <summary>Redraws the marker overlay for the visible window in two passes. Pass 1 maps each
+        /// event's <c>Timestamp − stream.FirstTimestamp</c> (seconds) to an x via
+        /// <see cref="MarkerLayout"/>, draws the line + caret for every in-window event, and (in Labels
+        /// mode) builds and measures a label candidate per event, truncating any single huge value so
+        /// it can't starve a whole stagger row. Pass 2 places the measured candidates into
+        /// <see cref="LabelRows"/> stagger rows via <see cref="MarkerLabelLayout"/>, skipping any label
+        /// that would overlap a neighbour rather than shrinking or overlapping it — legibility over
+        /// completeness. Labels are added to the Canvas after every line, which (Canvas paints in child
+        /// order) is what keeps them drawn on top of the lines rather than under them. Off-window events
+        /// are skipped, and the whole overlay is suppressed when the stream has no first timestamp (its
+        /// timeline zero is unknown), so events are never mis-placed.</summary>
         private void UpdateMarkers()
         {
             if (MarkerLayer == null) return;
@@ -536,7 +630,12 @@ namespace QuickLook.Plugin.XdfViewer
             double endSec = _durationSec * ((_viewStart + _viewCount) / _totalSamples);
             bool labels = _markerMode == 2;
 
-            int lines = 0, labelsDrawn = 0;
+            // Pass 1: draw every in-window line, and (in Labels mode) build + measure the candidates.
+            var labelBlocks = labels ? new List<TextBlock>() : null;
+            var labelXs = labels ? new List<double>() : null;
+            var labelWidths = labels ? new List<double>() : null;
+
+            int lines = 0;
             foreach (var m in _fullMarkers)
             {
                 double x = MarkerLayout.XForSeconds(m.Timestamp - firstTs, startSec, endSec, vp);
@@ -554,20 +653,39 @@ namespace QuickLook.Plugin.XdfViewer
                     Points = new PointCollection { new Point(x - 3, 0), new Point(x + 3, 0), new Point(x, 5) }
                 });
 
-                if (labels && labelsDrawn < MaxMarkerLabels && !string.IsNullOrEmpty(m.Value))
+                if (labels && labelBlocks.Count < MaxMarkerLabels && !string.IsNullOrEmpty(m.Value))
                 {
                     var tb = new TextBlock
                     {
-                        Text = m.Value, FontSize = 9, Foreground = MarkerBrush,
+                        Text = TruncateLabel(m.Value), FontSize = 9, Foreground = MarkerBrush,
                         Background = MarkerLabelBg, Padding = new Thickness(2, 0, 2, 0)
                     };
-                    Canvas.SetLeft(tb, x + 3);
-                    Canvas.SetTop(tb, 5);
-                    MarkerLayer.Children.Add(tb);
-                    labelsDrawn++;
+                    tb.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                    labelBlocks.Add(tb);
+                    labelXs.Add(x);
+                    labelWidths.Add(tb.DesiredSize.Width);
                 }
             }
+
+            if (!labels) return;
+
+            // Pass 2: stagger into rows, skipping anything that would overlap. Adding the labels after
+            // every line also keeps them on top — a Canvas paints in child order.
+            var placements = MarkerLabelLayout.Place(labelXs, labelWidths,
+                                                     LabelRows, MaxMarkerLabels, LabelGapPx);
+            foreach (var p in placements)
+            {
+                var tb = labelBlocks[p.Index];
+                Canvas.SetLeft(tb, p.X + 3);
+                Canvas.SetTop(tb, LabelTopPx + p.Row * LabelRowHeightPx);
+                MarkerLayer.Children.Add(tb);
+            }
         }
+
+        /// <summary>Clips an event value for the plot overlay so one long value cannot starve a whole
+        /// stagger row. The full text stays available in the events panel and the overview card.</summary>
+        private static string TruncateLabel(string s)
+            => s.Length <= MaxLabelChars ? s : s.Substring(0, MaxLabelChars) + "…";
 
         private void UpdateBadge()
         {
