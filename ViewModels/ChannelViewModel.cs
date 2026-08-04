@@ -24,6 +24,12 @@ namespace QuickLook.Plugin.XdfViewer.ViewModels
         public string Label => _channel.Label;
         public string Unit => _channel.Unit;
 
+        /// <summary>Label and unit as one string, for the row's hover tooltip. The row itself trims
+        /// with an ellipsis once the sparkline takes its share of the width, so this is the only way
+        /// to read a long channel name in full.</summary>
+        public string LabelWithUnit =>
+            string.IsNullOrEmpty(Unit) ? Label : Label + " " + Unit;
+
         /// <summary>Id of the owning stream (used to request an on-demand hi-res envelope read).</summary>
         public uint StreamId => _stream.Id;
 

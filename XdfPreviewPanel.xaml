@@ -126,24 +126,37 @@
                                         Visibility="{Binding IsFilteredOut, Converter={StaticResource InverseBoolToVis}}">
                               <Border Background="Transparent" Cursor="Hand"
                                       MouseLeftButtonUp="ChannelRow_MouseLeftButtonUp">
-                                <DockPanel>
-                                  <!-- Sparkline docked right so it aligns across rows regardless of label width -->
-                                  <controls:WaveformSparkline DockPanel.Dock="Right" Width="100" Height="16" Margin="8,0,0,0"
-                                    VerticalAlignment="Center"
-                                    Envelope="{Binding Sparkline}"
-                                    LineBrush="{DynamicResource WaveformBrush}"
-                                    Visibility="{Binding HasWaveform, Converter={StaticResource BoolToVis}}"/>
-                                  <!-- Flat-channel warning: sits just left of the sparkline -->
-                                  <TextBlock DockPanel.Dock="Right" Text="&#x26A0;&#xFE0E;"
+                                <!-- Proportional columns rather than a fixed-width sparkline docked right:
+                                     the wave was pinned at 100px however wide the card grew, so every extra
+                                     pixel went to the label column and the signal stayed small. Star widths
+                                     still align across rows (every row splits the same width by the same
+                                     ratio) but now scale with the card. -->
+                                <Grid>
+                                  <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="2*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="3*"/>
+                                  </Grid.ColumnDefinitions>
+                                  <!-- Trims once the wave takes its share, so the tooltip carries the full name -->
+                                  <TextBlock Grid.Column="0" Opacity="0.85" VerticalAlignment="Center"
+                                             TextTrimming="CharacterEllipsis"
+                                             ToolTip="{Binding LabelWithUnit}">
+                                    <Run Text="{Binding Label, Mode=OneWay}"/>
+                                    <Run Text="{Binding Unit, Mode=OneWay}" FontStyle="Italic" Foreground="#888"/>
+                                  </TextBlock>
+                                  <!-- Flat-channel warning: sits just left of the sparkline. Auto column, so it
+                                       costs nothing on the (usual) rows where it is collapsed. -->
+                                  <TextBlock Grid.Column="1" Text="&#x26A0;&#xFE0E;"
                                     FontFamily="Segoe UI Symbol" FontSize="12" Foreground="#9A9A9A"
                                     VerticalAlignment="Center" Margin="8,0,0,0"
                                     ToolTip="Flat channel — a constant value throughout the previewed data (often a disconnected or unused sensor)."
                                     Visibility="{Binding IsFlat, Converter={StaticResource BoolToVis}}"/>
-                                  <TextBlock Opacity="0.85" VerticalAlignment="Center" TextTrimming="CharacterEllipsis">
-                                    <Run Text="{Binding Label, Mode=OneWay}"/>
-                                    <Run Text="{Binding Unit, Mode=OneWay}" FontStyle="Italic" Foreground="#888"/>
-                                  </TextBlock>
-                                </DockPanel>
+                                  <controls:WaveformSparkline Grid.Column="2" Height="16" Margin="8,0,0,0"
+                                    HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                                    Envelope="{Binding Sparkline}"
+                                    LineBrush="{DynamicResource WaveformBrush}"
+                                    Visibility="{Binding HasWaveform, Converter={StaticResource BoolToVis}}"/>
+                                </Grid>
                               </Border>
                               <StackPanel Margin="0,4,0,6"
                                           Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVis}}">
@@ -180,7 +193,11 @@
                                  60+ chars in PsychoPy/LabRecorder files) become reachable rather than clipped.
                                  Both padding gutters reserve room for the thumbs, which QuickLook's scrollbar
                                  style paints over the content instead of in their own row/column. -->
-                            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                            <!-- Background=Transparent makes the whole box hit-testable. Without it
+                                 only the glyphs are, and the WM_MOUSEHWHEEL hook - which finds its
+                                 target by walking up from Mouse.DirectlyOver - misses whenever the
+                                 pointer sits in the gap between two event rows. -->
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" Background="Transparent"
                                           HorizontalScrollBarVisibility="Auto" Padding="0,0,14,14">
                               <ItemsPresenter/>
                             </ScrollViewer>
@@ -188,7 +205,9 @@
                         </ItemsControl.Template>
                         <ItemsControl.ItemTemplate>
                           <DataTemplate>
-                            <TextBlock Opacity="0.85">
+                            <!-- Tooltip carries the full value: horizontal scrolling reaches it, but
+                                 hovering reads it without leaving the row you were looking at. -->
+                            <TextBlock Opacity="0.85" ToolTip="{Binding Value}">
                               <Run Text="{Binding TimeLabel, Mode=OneWay}" Foreground="#888"/>
                               <Run Text="  "/>
                               <Run Text="{Binding Value, Mode=OneWay}"/>
@@ -306,7 +325,7 @@
                      SelectionChanged="EventsList_SelectionChanged">
               <ListBox.ItemTemplate>
                 <DataTemplate>
-                  <TextBlock Opacity="0.85" FontSize="11">
+                  <TextBlock Opacity="0.85" FontSize="11" ToolTip="{Binding Value}">
                     <Run Text="{Binding TimeLabel, Mode=OneWay}" Foreground="#888"/>
                     <Run Text="  "/>
                     <Run Text="{Binding Value, Mode=OneWay}"/>
