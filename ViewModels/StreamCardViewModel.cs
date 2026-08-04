@@ -72,6 +72,22 @@ namespace QuickLook.Plugin.XdfViewer.ViewModels
         private bool _noChannelMatch;
         public void SetNoChannelMatch(bool value) => NoChannelMatch = value;
 
+        /// <summary>True when a search query is active and no event in this (marker) stream matches —
+        /// drives the card's "no matching events" hint. The marker-stream counterpart of
+        /// <see cref="NoChannelMatch"/>.</summary>
+        public bool NoMarkerMatch
+        {
+            get => _noMarkerMatch;
+            private set
+            {
+                if (_noMarkerMatch == value) return;
+                _noMarkerMatch = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(NoMarkerMatch)));
+            }
+        }
+        private bool _noMarkerMatch;
+        public void SetNoMarkerMatch(bool value) => NoMarkerMatch = value;
+
         public event PropertyChangedEventHandler PropertyChanged;
 
         private static string FormatRate(double hz)

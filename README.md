@@ -35,8 +35,9 @@ front.
   across up to three rows and collision-skipped so they stay readable at every zoom level.
 - **Events panel** — a collapsible strip in the channel-focus view listing every event, with
   a click centring the plot on it at the current zoom.
-- **Channel search** — filter channels by name across every stream, for recordings
-  with 100+ channels (e.g. a 144-channel Trigno EMG stream).
+- **Search** — filter channels by name and events by value across every stream, for
+  recordings with 100+ channels (e.g. a 144-channel Trigno EMG stream) or hundreds
+  of events.
 - **Flat-channel warning** (grey ⚠) for constant/dead channels, and an
   **incomplete** badge for recordings that were cut short mid-capture.
 - **Bounded cost** — decimated reads, windowed re-reads of only the visible range,
@@ -94,7 +95,7 @@ channel — a windowed signal viewer:
   the amplitude (Y) axis and baseline stay fixed while you pan, and the time
   (X) axis relabels for the visible window.
 - **Events panel:** a collapsible strip on the right, opened via its toggle tab
-  (collapsed by default) — see [Markers & channel search](#markers--channel-search)
+  (collapsed by default) — see [Markers & search](#markers--search)
   for what it shows and does.
 
 Only the **visible window** is decoded on each zoom/pan (a debounced,
@@ -105,7 +106,7 @@ whole file is never re-scanned per action. (One known limit: a stream written
 as a single enormous `Samples` chunk must be decoded from the chunk start —
 uncommon, since LabRecorder chunks periodically.)
 
-## Markers & channel search
+## Markers & search
 
 Marker-stream events can be drawn over the full-window plot as vertical lines, so
 you can see where events fall relative to the signal. The **Markers** selector in
@@ -133,10 +134,12 @@ the current zoom level. Like the overlay, the panel is hidden for a channel whos
 stream has no usable first timestamp, since without one every event would render as
 the same near-identical raw clock reading rather than a meaningful relative time.
 
-The **search box** in the top-right filters channel rows by name across every stream
-card — useful for finding one channel in a 144-channel recording. Cards stay in
-place and show "no matching channels" when everything in them is filtered out;
-marker streams are unaffected.
+The **search box** in the top-right filters every card at once: channel rows by name,
+and event rows by value — useful for finding one channel in a 144-channel recording,
+or every occurrence of one stimulus among hundreds of events. Cards stay in place and
+show "no matching channels" / "no matching events" when everything in them is filtered
+out. Event *times* are not searched, since a query like `5` would match most timestamps
+and bury the event names.
 
 ## Shortcuts
 
@@ -146,7 +149,7 @@ marker streams are unaffected.
 |---|---|
 | Click a channel row | Expand/collapse its inline waveform |
 | Click the expanded plot | Open the full-window zoom view |
-| Type in the search box (top-right) | Filter channels by name |
+| Type in the search box (top-right) | Filter channels by name and events by value |
 
 **Full-window view**
 
@@ -209,9 +212,10 @@ restart QuickLook.
     offers Lines (vertical event lines only) and Off (nothing). Lines line up with
     the events listed on the marker-stream card. The selector is absent for files
     without events.
-18. Typing in the top-right search box filters channel rows across all cards;
-    clearing it restores them. A query matching nothing shows "no matching
-    channels" on the affected cards, and marker cards are unaffected.
+18. Typing in the top-right search box filters channel rows and event rows across
+    all cards; clearing it restores them. A query matching nothing shows "no matching
+    channels" / "no matching events" on the affected cards. Event times are not
+    searched — only values.
 19. In the full-window view, the **events panel** toggle tab on the right edge opens
     a collapsed-by-default list of every event; clicking one centres the plot on it
     without changing the zoom level. For a channel with no usable first timestamp,

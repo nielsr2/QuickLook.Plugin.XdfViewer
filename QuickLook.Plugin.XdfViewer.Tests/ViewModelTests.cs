@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using QuickLook.Plugin.XdfViewer.ViewModels;
 using QuickLook.Plugin.XdfViewer.Xdf.Model;
 using Xunit;
@@ -224,6 +225,115 @@ namespace QuickLook.Plugin.XdfViewer.Tests
             // Same rule TimeLabel already follows when the recording start is unknown.
             var vm = new MarkerViewModel(new XdfMarker { Timestamp = 42.25, Value = "Cross" }, null);
             Assert.Equal(42.25, vm.RelativeSeconds, 6);
+        }
+
+        /// <summary>A file with one EEG stream (Fp1/Cz) and one marker stream carrying
+        /// PsychoPy-shaped event values, for the search tests below.</summary>
+        private static XdfOverviewViewModel SearchFixture()
+        {
+            var eeg = new XdfStream
+            {
+                Name = "BioSemi", Type = "EEG", ChannelCount = 2,
+                ChannelFormat = "float32", NominalSampleRate = 512
+            };
+            eeg.Channels.Add(new XdfChannel { Label = "Fp1", Unit = "uV" });
+            eeg.Channels.Add(new XdfChannel { Label = "Cz", Unit = "uV" });
+
+            var markers = new XdfStream
+            {
+                Name = "PsychoPyMarkers", Type = "Markers", ChannelCount = 1,
+                ChannelFormat = "string"
+            };
+            markers.Markers.Add(new XdfMarker { Timestamp = 10, Value = "Start_7543_DrNo_Or.mp4" });
+            markers.Markers.Add(new XdfMarker { Timestamp = 20, Value = "Cross | null | null" });
+            markers.Markers.Add(new XdfMarker { Timestamp = 30, Value = "End_7543_DrNo_Or.mp4" });
+
+            var file = new XdfFile();
+            file.Streams.Add(eeg);
+            file.Streams.Add(markers);
+            return new XdfOverviewViewModel(file, "test.xdf");
+        }
+
+        [Fact]
+        public void Search_FiltersEventRowsByValue()
+        {
+            var vm = SearchFixture();
+
+            vm.ApplySearch("drno");   // case-insensitive, matches 2 of the 3 events
+
+            var markers = vm.Streams[1].Markers;
+            Assert.False(markers[0].IsFilteredOut);
+            Assert.True(markers[1].IsFilteredOut);    // "Cross | null | null"
+            Assert.False(markers[2].IsFilteredOut);
+            Assert.False(vm.Streams[1].NoMarkerMatch);
+        }
+
+        [Fact]
+        public void Search_MatchingNoEvent_FlagsTheMarkerCard()
+        {
+            var vm = SearchFixture();
+
+            vm.ApplySearch("zzz");
+
+            Assert.All(vm.Streams[1].Markers, m => Assert.True(m.IsFilteredOut));
+            Assert.True(vm.Streams[1].NoMarkerMatch);
+            Assert.True(vm.Streams[0].NoChannelMatch);   // and the EEG card, as before
+        }
+
+        [Fact]
+        public void Search_ClearingTheQuery_RestoresEveryRow()
+        {
+            var vm = SearchFixture();
+            vm.ApplySearch("drno");
+
+            vm.ApplySearch("");
+
+            Assert.All(vm.Streams[1].Markers, m => Assert.False(m.IsFilteredOut));
+            Assert.All(vm.Streams[0].Channels, c => Assert.False(c.IsFilteredOut));
+            Assert.False(vm.Streams[1].NoMarkerMatch);
+            Assert.False(vm.Streams[0].NoChannelMatch);
+        }
+
+        [Fact]
+        public void Search_FiltersChannelsAndEventsIndependently()
+        {
+            // A query hitting only channels must still empty the marker card, and vice versa —
+            // the two card kinds are filtered by the same query but against different text.
+            var vm = SearchFixture();
+
+            vm.ApplySearch("Fp1");
+
+            Assert.False(vm.Streams[0].Channels[0].IsFilteredOut);
+            Assert.True(vm.Streams[0].Channels[1].IsFilteredOut);
+            Assert.False(vm.Streams[0].NoChannelMatch);
+            Assert.All(vm.Streams[1].Markers, m => Assert.True(m.IsFilteredOut));
+            Assert.True(vm.Streams[1].NoMarkerMatch);
+        }
+
+        [Fact]
+        public void Search_DoesNotMatchAgainstEventTimes()
+        {
+            // "10" is the first event's timestamp but appears in no value; matching times would
+            // make numeric queries useless.
+            var vm = SearchFixture();
+
+            vm.ApplySearch("10");
+
+            Assert.All(vm.Streams[1].Markers, m => Assert.True(m.IsFilteredOut));
+            Assert.True(vm.Streams[1].NoMarkerMatch);
+        }
+
+        [Fact]
+        public void Search_RaisesPropertyChangedSoRowsActuallyHide()
+        {
+            var vm = SearchFixture();
+            var marker = vm.Streams[1].Markers[1];
+            var raised = new List<string>();
+            marker.PropertyChanged += (s, e) => raised.Add(e.PropertyName);
+
+            vm.ApplySearch("drno");
+
+            Assert.Contains(nameof(MarkerViewModel.IsFilteredOut), raised);
         }
 
         [Fact]
