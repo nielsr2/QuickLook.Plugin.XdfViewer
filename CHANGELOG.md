@@ -7,8 +7,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [1.1.0] — Unreleased
 
 ### Added
-- Collapsible events panel in the channel-focus view: browse every event in the file
-  and click one to centre the plot on it, keeping the current zoom.
+- Collapsible events panel in the channel-focus view: browse the file's events and
+  click one to centre the plot on it, keeping the current zoom.
 
 ### Changed
 - Marker overlay defaults to `Labels` instead of `Lines`.

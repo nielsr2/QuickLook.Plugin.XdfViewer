@@ -31,7 +31,10 @@ front.
   axes, a vertical-scale slider, and a "sample-accurate" badge.
 - **Hover crosshair** with a time + amplitude readout under the pointer.
 - **Marker overlay** — marker-stream events drawn as vertical lines on the full view,
-  switchable between **Off / Lines / Labels**.
+  switchable between **Off / Lines / Labels** (Labels by default), with labels staggered
+  across up to three rows and collision-skipped so they stay readable at every zoom level.
+- **Events panel** — a collapsible strip in the channel-focus view listing every event, with
+  a click centring the plot on it at the current zoom.
 - **Channel search** — filter channels by name across every stream, for recordings
   with 100+ channels (e.g. a 144-channel Trigno EMG stream).
 - **Flat-channel warning** (grey ⚠) for constant/dead channels, and an
@@ -71,7 +74,8 @@ never blocked waiting on sample decoding. Very large streams are decimated
 (strided sampling into a fixed bucket count) rather than fully decoded, so
 memory and load time stay bounded regardless of recording size. Marker
 streams are event streams, not waveforms, so their rows show timestamps/values
-and no sparkline.
+and no sparkline; the events box scrolls horizontally so long event values
+stay readable instead of being clipped at the card edge.
 
 ### Full-window view (zoomable)
 
@@ -89,6 +93,9 @@ channel — a windowed signal viewer:
 - **Vertical scale:** the slider amplifies amplitude about a robust baseline;
   the amplitude (Y) axis and baseline stay fixed while you pan, and the time
   (X) axis relabels for the visible window.
+- **Events panel:** a collapsible strip on the right, opened via its toggle tab
+  (collapsed by default) — see [Markers & channel search](#markers--channel-search)
+  for what it shows and does.
 
 Only the **visible window** is decoded on each zoom/pan (a debounced,
 sub-range read), so panning/zooming stays responsive even on large recordings;
@@ -107,13 +114,24 @@ the settings row switches between:
 | Mode | Shows |
 |---|---|
 | **Off** | nothing |
-| **Lines** | a vertical line + caret per event (default) |
-| **Labels** | the same, plus each event's value as a label |
+| **Lines** | a vertical line + caret per event |
+| **Labels** | the same, plus each event's value as a label (default) |
+
+In Labels mode, labels are staggered across up to three rows, and any label that
+would overlap a neighbour is skipped rather than drawn on top of it — so more
+labels appear as you zoom in and the row stays legible at every zoom level.
 
 Events are placed relative to the **selected stream's own first timestamp**. Raw LSL
 clock values are used as-is (no cross-stream `ClockOffset` correction — overkill for a
 preview), and if a stream has no usable first timestamp the overlay is suppressed
 rather than drawn in the wrong place. The selector is hidden for files with no events.
+
+The full-window view also has a collapsible **events panel** — a toggle tab on the
+right edge that slides a list of every event into view (collapsed by default, so it
+doesn't take up space until you want it). Clicking an event centres the plot on it at
+the current zoom level. Like the overlay, the panel is hidden for a channel whose
+stream has no usable first timestamp, since without one every event would render as
+the same near-identical raw clock reading rather than a meaningful relative time.
 
 The **search box** in the top-right filters channel rows by name across every stream
 card — useful for finding one channel in a 144-channel recording. Cards stay in
@@ -146,6 +164,8 @@ marker streams are unaffected.
 | Hover | Crosshair with time + amplitude readout |
 | Vertical scale slider | Amplitude gain about the baseline |
 | Markers selector | Off / Lines / Labels |
+| Events panel toggle tab | Expand/collapse the events list |
+| Click an event in the panel | Centre the plot on it, keeping the current zoom |
 
 ## Install
 
@@ -184,13 +204,20 @@ restart QuickLook.
     (time relative to the stream start, plus amplitude and unit).
 16. **Esc** closes the full view; **Home**/**End** jump to the start/end keeping the
     zoom width; **double-click** resets to fully zoomed out at vertical scale ×1.
-17. On a file with a marker stream, the **Markers** selector draws vertical event
-    lines (Lines) and event values (Labels), and removes them (Off). Lines line up
-    with the events listed on the marker-stream card. The selector is absent for
-    files without events.
+17. On a file with a marker stream, events default to **Labels** (staggered across up
+    to three rows, overlapping labels skipped) and the **Markers** selector also
+    offers Lines (vertical event lines only) and Off (nothing). Lines line up with
+    the events listed on the marker-stream card. The selector is absent for files
+    without events.
 18. Typing in the top-right search box filters channel rows across all cards;
     clearing it restores them. A query matching nothing shows "no matching
     channels" on the affected cards, and marker cards are unaffected.
+19. In the full-window view, the **events panel** toggle tab on the right edge opens
+    a collapsed-by-default list of every event; clicking one centres the plot on it
+    without changing the zoom level. For a channel with no usable first timestamp,
+    the panel is hidden entirely rather than showing unusable raw-clock rows.
+20. On the overview card, a marker stream's events box scrolls horizontally when an
+    event value is too long to fit.
 
 ## Test
 

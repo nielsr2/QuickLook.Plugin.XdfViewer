@@ -156,5 +156,15 @@ namespace QuickLook.Plugin.XdfViewer.Tests
             Assert.Equal(0, w.Start, P);
             Assert.Equal(0, w.Count, P);
         }
+
+        [Fact]
+        public void CenterOn_NaNSample_YieldsNaNStart_SoCallersMustGuard()
+        {
+            // Clamp's comparisons are all false for NaN, so NaN passes straight through. This is
+            // why SetView and the events-panel click handler guard against non-finite values:
+            // FullScrollBar.Value (a RangeBase) throws ArgumentException on NaN.
+            var w = FullViewMath.CenterOn(double.NaN, count: 100, total: 1000);
+            Assert.True(double.IsNaN(w.Start));
+        }
     }
 }
