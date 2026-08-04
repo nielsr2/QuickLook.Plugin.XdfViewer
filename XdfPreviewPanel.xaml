@@ -260,7 +260,7 @@
             <TextBlock x:Name="MarkerModeLabel" Text="Markers" Opacity="0.7" FontSize="11"
                        VerticalAlignment="Center" Margin="16,0,0,0"/>
             <ComboBox x:Name="MarkerModeCombo" Width="82" Margin="6,0,0,0" VerticalAlignment="Center"
-                      SelectedIndex="1" SelectionChanged="MarkerModeCombo_SelectionChanged">
+                      SelectedIndex="2" SelectionChanged="MarkerModeCombo_SelectionChanged">
               <ComboBoxItem>Off</ComboBoxItem>
               <ComboBoxItem>Lines</ComboBoxItem>
               <ComboBoxItem>Labels</ComboBoxItem>

@@ -52,7 +52,12 @@ namespace QuickLook.Plugin.XdfViewer
         private const double Inset = 12.0;           // must match FullWave.VerticalInset
         private const int ReadDebounceMs = 110;
         private const int MaxMarkerLines = 4000;     // safety cap against pathological event counts
-        private const int MaxMarkerLabels = 60;      // beyond this, Labels mode falls back to lines only
+        private const int MaxMarkerLabels = 200;     // safety cap only; collision-skip is the real bound
+        private const int LabelRows = 3;             // stagger rows, filled top-first
+        private const double LabelRowHeightPx = 13;  // 9px font + leading
+        private const double LabelTopPx = 5;         // row 0's y, just under the arrow heads
+        private const double LabelGapPx = 6;         // minimum clearance between labels sharing a row
+        private const int MaxLabelChars = 28;        // one huge value must not starve a whole row
         private const double MinCardWidth = 320.0;   // narrowest a stream card should get before dropping a column
 
         /// <summary>Column count for the stream-card grid, recomputed from the available width so the
@@ -68,7 +73,7 @@ namespace QuickLook.Plugin.XdfViewer
 
         // Marker overlay state: the file's events + the display mode (index matches the ComboBox).
         private readonly List<XdfMarker> _fullMarkers = new List<XdfMarker>();
-        private int _markerMode = 1;                 // 0 = Off, 1 = Lines, 2 = Labels
+        private int _markerMode = 2;                 // 0 = Off, 1 = Lines, 2 = Labels
 
         // Amber reads clearly over the waveform on both light and dark themes.
         private static readonly Brush MarkerBrush = Frozen(Color.FromRgb(0xE0, 0x8E, 0x2A));
@@ -359,6 +364,9 @@ namespace QuickLook.Plugin.XdfViewer
             if (_file != null)
                 foreach (var s in _file.Streams)
                     if (s.IsMarkerStream) _fullMarkers.AddRange(s.Markers);
+            // Chronological across streams. A file with two marker streams concatenates out of order,
+            // and the label layout is a single left-to-right pass that mis-skips on unordered input.
+            _fullMarkers.Sort((a, b) => a.Timestamp.CompareTo(b.Timestamp));
             bool hasMarkers = _fullMarkers.Count > 0;
             MarkerModeLabel.Visibility = MarkerModeCombo.Visibility =
                 hasMarkers ? Visibility.Visible : Visibility.Collapsed;
@@ -536,7 +544,12 @@ namespace QuickLook.Plugin.XdfViewer
             double endSec = _durationSec * ((_viewStart + _viewCount) / _totalSamples);
             bool labels = _markerMode == 2;
 
-            int lines = 0, labelsDrawn = 0;
+            // Pass 1: draw every in-window line, and (in Labels mode) build + measure the candidates.
+            var labelBlocks = labels ? new List<TextBlock>() : null;
+            var labelXs = labels ? new List<double>() : null;
+            var labelWidths = labels ? new List<double>() : null;
+
+            int lines = 0;
             foreach (var m in _fullMarkers)
             {
                 double x = MarkerLayout.XForSeconds(m.Timestamp - firstTs, startSec, endSec, vp);
@@ -554,20 +567,39 @@ namespace QuickLook.Plugin.XdfViewer
                     Points = new PointCollection { new Point(x - 3, 0), new Point(x + 3, 0), new Point(x, 5) }
                 });
 
-                if (labels && labelsDrawn < MaxMarkerLabels && !string.IsNullOrEmpty(m.Value))
+                if (labels && labelBlocks.Count < MaxMarkerLabels && !string.IsNullOrEmpty(m.Value))
                 {
                     var tb = new TextBlock
                     {
-                        Text = m.Value, FontSize = 9, Foreground = MarkerBrush,
+                        Text = TruncateLabel(m.Value), FontSize = 9, Foreground = MarkerBrush,
                         Background = MarkerLabelBg, Padding = new Thickness(2, 0, 2, 0)
                     };
-                    Canvas.SetLeft(tb, x + 3);
-                    Canvas.SetTop(tb, 5);
-                    MarkerLayer.Children.Add(tb);
-                    labelsDrawn++;
+                    tb.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                    labelBlocks.Add(tb);
+                    labelXs.Add(x);
+                    labelWidths.Add(tb.DesiredSize.Width);
                 }
             }
+
+            if (!labels) return;
+
+            // Pass 2: stagger into rows, skipping anything that would overlap. Adding the labels after
+            // every line also keeps them on top — a Canvas paints in child order.
+            var placements = MarkerLabelLayout.Place(labelXs, labelWidths,
+                                                     LabelRows, MaxMarkerLabels, LabelGapPx);
+            foreach (var p in placements)
+            {
+                var tb = labelBlocks[p.Index];
+                Canvas.SetLeft(tb, p.X + 3);
+                Canvas.SetTop(tb, LabelTopPx + p.Row * LabelRowHeightPx);
+                MarkerLayer.Children.Add(tb);
+            }
         }
+
+        /// <summary>Clips an event value for the plot overlay so one long value cannot starve a whole
+        /// stagger row. The full text stays available in the events panel and the overview card.</summary>
+        private static string TruncateLabel(string s)
+            => s.Length <= MaxLabelChars ? s : s.Substring(0, MaxLabelChars) + "…";
 
         private void UpdateBadge()
         {
