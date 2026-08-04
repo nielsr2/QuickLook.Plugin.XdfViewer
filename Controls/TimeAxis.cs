@@ -7,7 +7,7 @@ using System.Windows.Media;
 namespace QuickLook.Plugin.XdfViewer.Controls
 {
     /// <summary>
-    /// Draws a horizontal time axis (a top rule, tick marks, and "N s" labels) across the visible
+    /// Draws a horizontal time axis (a top rule, tick marks, and time labels) across the visible
     /// window [<see cref="StartSeconds"/>, <see cref="EndSeconds"/>]. Sits under the full-window
     /// waveform. When no window is set it falls back to [0, <see cref="DurationSeconds"/>].
     /// </summary>
@@ -65,13 +65,16 @@ namespace QuickLook.Plugin.XdfViewer.Controls
             var typeface = new Typeface("Segoe UI");
             double dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
 
-            foreach (double t in Ticks(start, end, width))
+            double[] ticks = Ticks(start, end, width);
+            string[] labels = Labels(ticks, NiceStep(span, width));
+
+            for (int i = 0; i < ticks.Length; i++)
             {
-                double x = width * ((t - start) / span);
+                double x = width * ((ticks[i] - start) / span);
                 dc.DrawLine(pen, new Point(x, 0), new Point(x, 4));
 
                 var ft = new FormattedText(
-                    FormatTime(t), CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+                    labels[i], CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
                     typeface, 10, brush, dpi);
                 double tx = x + 2;
                 if (tx + ft.Width > width) tx = width - ft.Width; // keep the last label on-screen
@@ -112,14 +115,64 @@ namespace QuickLook.Plugin.XdfViewer.Controls
             return nice * mag;
         }
 
-        private static string FormatTime(double s)
+        /// <summary>
+        /// Labels for <paramref name="ticks"/>, at the precision <paramref name="step"/> demands.
+        /// The first tick of each whole second is written in full ("1764.002s"); the ones after it
+        /// show only the fraction that changed (".004"), which is what keeps sub-second labels
+        /// legible — at a 2 ms step every tick would otherwise repeat the same "1764." prefix and
+        /// run into its neighbour. A tick that lands in a new second is written in full again, so
+        /// crossing a boundary can never read as an ambiguous ".000".
+        ///
+        /// Precision comes from the step, not from the timestamp's magnitude: deriving it from the
+        /// magnitude is what collapsed every tick in a 26 ms window at t≈1764s to a bare "1764s".
+        /// Pure/WPF-free.
+        /// </summary>
+        internal static string[] Labels(double[] ticks, double step)
         {
-            double a = Math.Abs(s);
-            return a >= 100
-                ? s.ToString("0", CultureInfo.InvariantCulture) + "s"
-                : a >= 1
-                    ? s.ToString("0.##", CultureInfo.InvariantCulture) + "s"
-                    : s.ToString("0.###", CultureInfo.InvariantCulture) + "s";
+            if (ticks == null || ticks.Length == 0) return new string[0];
+
+            int decimals = DecimalsFor(step);
+            var labels = new string[ticks.Length];
+
+            if (decimals == 0)
+            {
+                for (int i = 0; i < ticks.Length; i++)
+                    labels[i] = ticks[i].ToString("0", CultureInfo.InvariantCulture) + "s";
+                return labels;
+            }
+
+            // Fixed (not "#") decimals so the fractions stay column-aligned: ".040", never ".04".
+            string fmt = "0." + new string('0', decimals);
+            double prevWhole = 0;
+            bool havePrev = false;
+
+            for (int i = 0; i < ticks.Length; i++)
+            {
+                string full = ticks[i].ToString(fmt, CultureInfo.InvariantCulture) + "s";
+                // Take the whole-second part from the formatted text, not from the raw double:
+                // rounding can carry 1764.9999 up to "1765.000", and the prefix has to match
+                // what was actually printed or the abbreviation would be wrong.
+                int dot = full.IndexOf('.');
+                double whole = double.Parse(full.Substring(0, dot), CultureInfo.InvariantCulture);
+
+                labels[i] = havePrev && whole == prevWhole
+                    ? full.Substring(dot, full.Length - dot - 1)   // ".004", no repeated unit
+                    : full;
+
+                prevWhole = whole;
+                havePrev = true;
+            }
+            return labels;
+        }
+
+        /// <summary>Decimal places a tick step needs to render distinctly: 2 ms → 3, 0.5 s → 1,
+        /// anything ≥ 1 s → 0. Capped at 9 so a degenerate step cannot produce an absurd label.</summary>
+        internal static int DecimalsFor(double step)
+        {
+            if (double.IsNaN(step) || double.IsInfinity(step) || step >= 1) return 0;
+            if (step <= 0) return 0;
+            int d = (int)Math.Ceiling(-Math.Log10(step) - 1e-9);
+            return d < 0 ? 0 : d > 9 ? 9 : d;
         }
     }
 }
