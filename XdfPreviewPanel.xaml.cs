@@ -52,7 +52,11 @@ namespace QuickLook.Plugin.XdfViewer
         private const double Inset = 12.0;           // must match FullWave.VerticalInset
         private const int ReadDebounceMs = 110;
         private const int MaxMarkerLines = 4000;     // safety cap against pathological event counts
-        private const int MaxMarkerLabels = 200;     // safety cap only; collision-skip is the real bound
+        // Measurement budget, not a placement budget: bounds how many in-window candidates get built
+        // and measured per frame. How many are actually drawn is bounded by collision-skip in
+        // MarkerLabelLayout.Place — a 3-row viewport physically holds only ~150 non-overlapping labels,
+        // so at 1000 this cap cannot bind before geometry does.
+        private const int MaxMarkerLabels = 1000;
         private const int LabelRows = 3;             // stagger rows, filled top-first
         private const double LabelRowHeightPx = 13;  // 9px font + leading
         private const double LabelTopPx = 5;         // row 0's y, just under the arrow heads
