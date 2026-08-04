@@ -209,5 +209,21 @@ namespace QuickLook.Plugin.XdfViewer.Tests
             var ex = Record.Exception(() => vm.ApplyDetail(null));
             Assert.Null(ex);
         }
+
+        [Fact]
+        public void Marker_RelativeSeconds_IsTheOffsetFromRecordingStart()
+        {
+            var vm = new MarkerViewModel(new XdfMarker { Timestamp = 1010.5, Value = "Cross" }, 1000.0);
+            Assert.Equal(10.5, vm.RelativeSeconds, 6);
+            Assert.Equal("Cross", vm.Value);
+        }
+
+        [Fact]
+        public void Marker_RelativeSeconds_FallsBackToTheRawTimestamp()
+        {
+            // Same rule TimeLabel already follows when the recording start is unknown.
+            var vm = new MarkerViewModel(new XdfMarker { Timestamp = 42.25, Value = "Cross" }, null);
+            Assert.Equal(42.25, vm.RelativeSeconds, 6);
+        }
     }
 }

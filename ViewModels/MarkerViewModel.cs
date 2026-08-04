@@ -13,11 +13,16 @@ namespace QuickLook.Plugin.XdfViewer.ViewModels
         public MarkerViewModel(XdfMarker marker, double? recordingStart)
         {
             Value = marker.Value;
-            double rel = recordingStart.HasValue ? marker.Timestamp - recordingStart.Value : marker.Timestamp;
-            TimeLabel = TimeFormat.FormatClock(rel);
+            RelativeSeconds = recordingStart.HasValue ? marker.Timestamp - recordingStart.Value : marker.Timestamp;
+            TimeLabel = TimeFormat.FormatClock(RelativeSeconds);
         }
 
         public string TimeLabel { get; }
         public string Value { get; }
+
+        /// <summary>Seconds from the recording start — the same zero <see cref="TimeLabel"/> displays —
+        /// or the raw timestamp when no start is known. The full view's events panel maps this to a
+        /// sample index to centre the plot on the event.</summary>
+        public double RelativeSeconds { get; }
     }
 }
