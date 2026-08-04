@@ -47,6 +47,47 @@ namespace QuickLook.Plugin.XdfViewer.ViewModels
         public ObservableCollection<StreamCardViewModel> Streams { get; }
 
         /// <summary>
+        /// Applies the search box's query across every card: numeric streams match on the channel
+        /// label, marker streams on the event value. Cards left with nothing visible are flagged so
+        /// they can say so. An empty or whitespace query clears the filter and unflags everything.
+        ///
+        /// Marker <em>times</em> are deliberately not searched: a query like "5" would match most
+        /// timestamps and drown the event names the box exists to find.
+        ///
+        /// Lives here rather than in the panel's code-behind because it is view-model state, not
+        /// view state — which also makes it testable without a WPF host.
+        /// </summary>
+        public void ApplySearch(string query)
+        {
+            bool filtering = !string.IsNullOrWhiteSpace(query);
+
+            foreach (var stream in Streams)
+            {
+                int visible = 0;
+                if (stream.IsMarkerStream)
+                {
+                    foreach (var m in stream.Markers)
+                    {
+                        bool match = TextSearch.Matches(m.Value, query);
+                        m.IsFilteredOut = !match;
+                        if (match) visible++;
+                    }
+                    stream.SetNoMarkerMatch(stream.Markers.Count > 0 && visible == 0 && filtering);
+                }
+                else
+                {
+                    foreach (var ch in stream.Channels)
+                    {
+                        bool match = TextSearch.Matches(ch.Label, query);
+                        ch.IsFilteredOut = !match;
+                        if (match) visible++;
+                    }
+                    stream.SetNoChannelMatch(stream.Channels.Count > 0 && visible == 0 && filtering);
+                }
+            }
+        }
+
+        /// <summary>
         /// Applies freshly computed sparkline envelopes to the matching stream/channel view models.
         /// Must be called on the UI thread (the caller is responsible for marshalling).
         /// </summary>

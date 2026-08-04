@@ -258,12 +258,14 @@ namespace QuickLook.Plugin.XdfViewer
             SummaryText.Text = vm.Summary;
             StreamsList.ItemsSource = vm.Streams;
 
-            // Reset the channel-search box and hide it when there are no numeric channels to filter.
-            ChannelSearchBox.Text = "";   // clears any prior filter via TextChanged
-            bool anyChannels = false;
+            // Reset the search box and hide it only when there is nothing at all to filter — events
+            // count as filterable, so a marker-only file still gets a box.
+            SearchBox.Text = "";   // clears any prior filter via TextChanged
+            bool anythingToFilter = false;
             foreach (var s in vm.Streams)
-                if (!s.IsMarkerStream && s.Channels.Count > 0) { anyChannels = true; break; }
-            ChannelSearchGrid.Visibility = anyChannels ? Visibility.Visible : Visibility.Collapsed;
+                if (s.IsMarkerStream ? s.Markers.Count > 0 : s.Channels.Count > 0)
+                { anythingToFilter = true; break; }
+            SearchGrid.Visibility = anythingToFilter ? Visibility.Visible : Visibility.Collapsed;
 
             UpdateCardColumns();
             Root.Visibility = Visibility.Visible;
@@ -280,35 +282,18 @@ namespace QuickLook.Plugin.XdfViewer
             CardColumns = CardLayout.ColumnsForWidth(StreamsList.ActualWidth, MinCardWidth, count);
         }
 
-        private void ChannelSearchBox_TextChanged(object sender, TextChangedEventArgs e)
+        private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
         {
-            string query = ChannelSearchBox.Text;
-            if (ChannelSearchPlaceholder != null)
-                ChannelSearchPlaceholder.Visibility =
+            string query = SearchBox.Text;
+            if (SearchPlaceholder != null)
+                SearchPlaceholder.Visibility =
                     string.IsNullOrEmpty(query) ? Visibility.Visible : Visibility.Collapsed;
-            ApplyChannelSearch(query);
+            ApplySearch(query);
         }
 
-        /// <summary>Filters channel rows across every numeric stream by label (case-insensitive
-        /// substring via <see cref="ViewModels.ChannelSearch"/>), flagging cards whose channels are
-        /// all filtered out. Marker streams are unaffected.</summary>
-        private void ApplyChannelSearch(string query)
-        {
-            if (_vm == null) return;
-            foreach (var stream in _vm.Streams)
-            {
-                if (stream.IsMarkerStream) continue;
-                int visible = 0;
-                foreach (var ch in stream.Channels)
-                {
-                    bool match = ViewModels.ChannelSearch.Matches(ch.Label, query);
-                    ch.IsFilteredOut = !match;
-                    if (match) visible++;
-                }
-                stream.SetNoChannelMatch(
-                    stream.Channels.Count > 0 && visible == 0 && !string.IsNullOrWhiteSpace(query));
-            }
-        }
+        /// <summary>Hands the query to the view model, which owns the filtering (and is testable
+        /// without a WPF host). See <see cref="XdfOverviewViewModel.ApplySearch"/>.</summary>
+        private void ApplySearch(string query) => _vm?.ApplySearch(query);
 
         public void ShowError(string message)
         {

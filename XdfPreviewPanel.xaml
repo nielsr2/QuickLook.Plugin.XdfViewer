@@ -46,11 +46,12 @@
             </StackPanel>
           </Border>
         </Popup>
-        <!-- Channel search (upper right): filters channel rows by label across all stream cards. -->
-        <Grid x:Name="ChannelSearchGrid" DockPanel.Dock="Right" Width="220"
+        <!-- Search (upper right): filters channel rows by label and event rows by value, across all
+             stream cards. -->
+        <Grid x:Name="SearchGrid" DockPanel.Dock="Right" Width="220"
               VerticalAlignment="Top" Margin="12,0,0,0">
-          <TextBox x:Name="ChannelSearchBox" Padding="6,3" TextChanged="ChannelSearchBox_TextChanged"/>
-          <TextBlock x:Name="ChannelSearchPlaceholder" Text="Filter channels…"
+          <TextBox x:Name="SearchBox" Padding="6,3" TextChanged="SearchBox_TextChanged"/>
+          <TextBlock x:Name="SearchPlaceholder" Text="Filter channels &amp; events…"
                      Margin="9,0,0,0" VerticalAlignment="Center" Opacity="0.45" IsHitTestVisible="False"/>
         </Grid>
         <!-- No filename here: QuickLook's own window chrome already shows it. -->
@@ -207,7 +208,9 @@
                           <DataTemplate>
                             <!-- Tooltip carries the full value: horizontal scrolling reaches it, but
                                  hovering reads it without leaving the row you were looking at. -->
-                            <TextBlock Opacity="0.85" ToolTip="{Binding Value}">
+                            <TextBlock Opacity="0.85" ToolTip="{Binding Value}"
+                                       Visibility="{Binding IsFilteredOut,
+                                         Converter={StaticResource InverseBoolToVis}}">
                               <Run Text="{Binding TimeLabel, Mode=OneWay}" Foreground="#888"/>
                               <Run Text="  "/>
                               <Run Text="{Binding Value, Mode=OneWay}"/>
@@ -219,6 +222,10 @@
                       <TextBlock Text="no matching channels" Opacity="0.5" FontSize="11"
                                  Margin="2,4,0,0" VerticalAlignment="Top"
                                  Visibility="{Binding NoChannelMatch, Converter={StaticResource BoolToVis}}"/>
+                      <!-- Same, for a marker stream whose events are all filtered out -->
+                      <TextBlock Text="no matching events" Opacity="0.5" FontSize="11"
+                                 Margin="2,4,0,0" VerticalAlignment="Top"
+                                 Visibility="{Binding NoMarkerMatch, Converter={StaticResource BoolToVis}}"/>
                     </Grid>
                   </Expander>
                 </DockPanel>
