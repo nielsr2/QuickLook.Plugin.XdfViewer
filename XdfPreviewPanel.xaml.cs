@@ -173,6 +173,10 @@ namespace QuickLook.Plugin.XdfViewer
 
         private HwndSource _hwndSource;
         private const int WM_MOUSEHWHEEL = 0x020E;
+        // Device-independent pixels per wheel notch (WHEEL_DELTA = 120) for horizontal scrolling.
+        // Three times a ScrollViewer's ~16px line step, matching its own LineRight/LineLeft feel.
+        // Trackpads send many sub-notch deltas, which the fractional maths passes through smoothly.
+        private const double HScrollPxPerNotch = 48.0;
 
         private void OnPanelLoaded(object sender, RoutedEventArgs e)
         {
@@ -187,24 +191,55 @@ namespace QuickLook.Plugin.XdfViewer
 
         private IntPtr WndHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
         {
-            if (msg != WM_MOUSEHWHEEL || _fullChannel == null || FullView.Visibility != Visibility.Visible)
-                return IntPtr.Zero;
+            if (msg != WM_MOUSEHWHEEL) return IntPtr.Zero;
 
             long w = IntPtr.Size == 8 ? wParam.ToInt64() : (uint)wParam.ToInt32();
             int delta = (short)((w >> 16) & 0xFFFF);
             if (delta == 0) return IntPtr.Zero;
 
-            // Only act when the pointer is over the plot (DPI-safe via WPF hit coordinates).
-            var p = Mouse.GetPosition(PlotCell);
-            if (p.X < 0 || p.Y < 0 || p.X > PlotCell.ActualWidth || p.Y > PlotCell.ActualHeight)
-                return IntPtr.Zero;
+            // Full view open and the pointer over the plot: horizontal wheel pans the time window.
+            // (Pointer test is DPI-safe via WPF hit coordinates rather than the message's screen point.)
+            if (_fullChannel != null && FullView.Visibility == Visibility.Visible)
+            {
+                var p = Mouse.GetPosition(PlotCell);
+                if (p.X >= 0 && p.Y >= 0 && p.X <= PlotCell.ActualWidth && p.Y <= PlotCell.ActualHeight)
+                {
+                    // Tilt/scroll right (delta > 0) advances the window forward in time.
+                    double panSamples = (delta / 120.0) * _viewCount * 0.2;
+                    var v = FullViewMath.Pan(_viewStart, _viewCount, _totalSamples, panSamples);
+                    SetView(v.Start, v.Count);
+                    handled = true;
+                    return IntPtr.Zero;
+                }
+            }
 
-            // Tilt/scroll right (delta > 0) advances the window forward in time.
-            double panSamples = (delta / 120.0) * _viewCount * 0.2;
-            var v = FullViewMath.Pan(_viewStart, _viewCount, _totalSamples, panSamples);
-            SetView(v.Start, v.Count);
+            // Anywhere else: scroll whatever is horizontally scrollable under the pointer — the
+            // card's events box, or the full view's events panel. This fallback is not optional
+            // polish: WM_MOUSEHWHEEL has no routed-event equivalent, so a ScrollViewer can never
+            // see trackpad horizontal scroll on its own and its scrollbar would be drag-only.
+            var sv = HorizontalScrollViewerUnderMouse();
+            if (sv == null) return IntPtr.Zero;
+
+            sv.ScrollToHorizontalOffset(sv.HorizontalOffset + (delta / 120.0) * HScrollPxPerNotch);
             handled = true;
             return IntPtr.Zero;
+        }
+
+        /// <summary>Nearest ScrollViewer above the pointer that actually has somewhere to scroll
+        /// horizontally, or null. Walks the tree by hand because WM_MOUSEHWHEEL surfaces no routed
+        /// event — there is no bubbling handler we could attach instead. Skipping ScrollViewers with
+        /// no horizontal extent lets the search pass through the page-level one (whose scrolling is
+        /// disabled) and reach the card's own.</summary>
+        private static ScrollViewer HorizontalScrollViewerUnderMouse()
+        {
+            var d = Mouse.DirectlyOver as DependencyObject;
+            while (d != null)
+            {
+                if (d is ScrollViewer sv && sv.ScrollableWidth > 0) return sv;
+                // Runs/other ContentElements aren't Visuals; VisualTreeHelper.GetParent throws on them.
+                d = d is Visual ? VisualTreeHelper.GetParent(d) : LogicalTreeHelper.GetParent(d);
+            }
+            return null;
         }
 
         /// <summary>Records the source file path/model so on-demand hi-res reads can re-open it later.</summary>

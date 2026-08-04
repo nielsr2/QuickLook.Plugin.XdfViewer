@@ -225,5 +225,30 @@ namespace QuickLook.Plugin.XdfViewer.Tests
             var vm = new MarkerViewModel(new XdfMarker { Timestamp = 42.25, Value = "Cross" }, null);
             Assert.Equal(42.25, vm.RelativeSeconds, 6);
         }
+
+        [Fact]
+        public void Channel_LabelWithUnit_JoinsLabelAndUnit()
+        {
+            var s = new XdfStream { Name = "BioSemi", Type = "EEG", ChannelCount = 1 };
+            s.Channels.Add(new XdfChannel { Label = "Fp1", Unit = "microvolts" });
+
+            var vm = new StreamCardViewModel(s);
+
+            Assert.Equal("Fp1 microvolts", vm.Channels[0].LabelWithUnit);
+        }
+
+        [Fact]
+        public void Channel_LabelWithUnit_OmitsAMissingUnit()
+        {
+            // No trailing space when the channel carries no unit — the tooltip is user-visible.
+            var s = new XdfStream { Name = "Rig", Type = "Misc", ChannelCount = 2 };
+            s.Channels.Add(new XdfChannel { Label = "Trigger", Unit = null });
+            s.Channels.Add(new XdfChannel { Label = "Sync", Unit = "" });
+
+            var vm = new StreamCardViewModel(s);
+
+            Assert.Equal("Trigger", vm.Channels[0].LabelWithUnit);
+            Assert.Equal("Sync", vm.Channels[1].LabelWithUnit);
+        }
     }
 }
