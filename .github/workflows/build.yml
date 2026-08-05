@@ -40,6 +40,29 @@ jobs:
           name: QuickLook.Plugin.XdfViewer.qlplugin
           path: QuickLook.Plugin.XdfViewer.qlplugin
 
+      # The tag name is the one release input nothing else validates: pack-zip.ps1 stamps
+      # the package from $(PluginVersion), so a v1.2.0 tag would happily ship a plugin
+      # that reports 1.1.0. Fail the release instead, and reuse the version to pull that
+      # release's notes out of the CHANGELOG so the Release page isn't blank (v1.0.0's was).
+      - name: Check tag matches PluginVersion, extract release notes
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          $version = '${{ github.ref_name }}' -replace '^v',''
+          $props = [xml](Get-Content Directory.Build.props)
+          $declared = ($props.Project.PropertyGroup | Where-Object { $_.PluginVersion } |
+                       Select-Object -First 1).PluginVersion
+          if ($declared.Trim() -ne $version) {
+            throw "Tag v$version does not match PluginVersion $($declared.Trim())"
+          }
+          $text = Get-Content CHANGELOG.md -Raw
+          $pattern = "(?ms)^## \[$([regex]::Escape($version))\][^\r\n]*\r?\n(.*?)(?=^## \[|\z)"
+          $m = [regex]::Match($text, $pattern)
+          if (-not $m.Success) { throw "No CHANGELOG section for $version" }
+          $m.Groups[1].Value.Trim() | Set-Content RELEASE_NOTES.md -Encoding utf8
+          Write-Host "--- release notes ---"
+          Get-Content RELEASE_NOTES.md
+
       # On a version tag (e.g. v1.0.0) also publish the .qlplugin as a GitHub Release asset,
       # which is what the QuickLook plugin list links to for downloads.
       - name: Publish Release (on tag)
@@ -47,5 +70,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: QuickLook.Plugin.XdfViewer.qlplugin
+          body_path: RELEASE_NOTES.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
