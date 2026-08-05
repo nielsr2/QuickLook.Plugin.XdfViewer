@@ -11,6 +11,8 @@ every stream (EEG, ECG, EMG, respiration, accelerometer, markers, and more),
 plus zoomable per-channel waveforms — without loading the raw sample data up
 front.
 
+![Demo: pressing Space in Explorer on an XDF file opens the overview instantly — one card per stream, with per-channel sparklines and a scrollable events list. Clicking a channel opens the full-window view, where the plot zooms to individual samples, marker labels stagger across rows above the trace, a crosshair reads out time and amplitude under the pointer, and a side panel lists the file's events. The waveform color theme is switched from the settings flyout at the end.](assets/demo.gif)
+
 ![Overview: two streams from a Trigno EMG/IMU recording, with per-stream-type icons, per-channel sparklines, unit labels, and a channel filter box, in the Purple waveform color theme](assets/screenshot-overview.png)
 
 ![Full-window zoom view of an EMG channel showing a muscle-activation burst, with a minimap and pan/zoom controls, in the Purple waveform color theme](assets/screenshot-fullview.png)
