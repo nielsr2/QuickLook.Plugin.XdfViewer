@@ -322,6 +322,15 @@
           <DockPanel Grid.Column="1" Width="260" Margin="4,0,0,0"
                      Visibility="{Binding IsChecked, ElementName=EventsToggle,
                                   Converter={StaticResource BoolToVis}}">
+            <!-- Filters the list by event value (never by time — "5" would match most timestamps).
+                 Esc clears the query before it closes the view; see FullView_PreviewKeyDown. -->
+            <Grid DockPanel.Dock="Top" Margin="0,0,0,4">
+              <TextBox x:Name="EventsSearchBox" Padding="6,3" FontSize="11"
+                       TextChanged="EventsSearchBox_TextChanged"/>
+              <TextBlock x:Name="EventsSearchPlaceholder" Text="Filter events…"
+                         Margin="9,0,0,0" VerticalAlignment="Center" Opacity="0.45"
+                         IsHitTestVisible="False"/>
+            </Grid>
             <TextBlock x:Name="EventsPanelHeader" DockPanel.Dock="Top" Opacity="0.6"
                        FontSize="11" Margin="0,0,0,4"/>
             <ListBox x:Name="EventsList" Background="Transparent" BorderThickness="0"

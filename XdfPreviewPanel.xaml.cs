@@ -83,6 +83,7 @@ namespace QuickLook.Plugin.XdfViewer
         // focused channel because the times are relative to that channel's stream first timestamp.
         private readonly List<MarkerViewModel> _fullMarkerVms = new List<MarkerViewModel>();
         private bool _navigatingToEvent;             // re-entrancy guard while clearing SelectedItem
+        private bool _fullMarkersTruncated;          // any marker stream hit the per-stream read cap
 
         // Amber reads clearly over the waveform on both light and dark themes.
         private static readonly Brush MarkerBrush = Frozen(Color.FromRgb(0xE0, 0x8E, 0x2A));
@@ -417,15 +418,23 @@ namespace QuickLook.Plugin.XdfViewer
             EventsList.ItemsSource = null;            // force a rebind; the list instance is reused
             EventsList.ItemsSource = _fullMarkerVms;
 
+            // Filter the view rather than collapsing item containers: hidden rows then leave the
+            // scroll extent and the keyboard/selection path entirely, so EventsList_SelectionChanged
+            // can never seek to an event the query is hiding.
+            var view = CollectionViewSource.GetDefaultView(EventsList.ItemsSource);
+            if (view != null) view.Filter = o => !((MarkerViewModel)o).IsFilteredOut;
+
             // Mirror StreamCardViewModel's "500+ events" so a truncated read is never presented as
             // complete, and singularize so a lone event doesn't read as "1 events".
-            bool truncated = false;
+            _fullMarkersTruncated = false;
             if (_file != null)
                 foreach (var s in _file.Streams)
-                    if (s.IsMarkerStream && s.MarkersTruncated) { truncated = true; break; }
-            int shownCount = _fullMarkerVms.Count;
-            EventsPanelHeader.Text = shownCount + (truncated ? "+" : "") + " "
-                                   + StreamCardViewModel.Plural(shownCount, truncated, "event");
+                    if (s.IsMarkerStream && s.MarkersTruncated) { _fullMarkersTruncated = true; break; }
+
+            // Each channel opens unfiltered. Setting Text won't raise TextChanged when the box is
+            // already empty, so the header/filter pass is made explicitly either way.
+            EventsSearchBox.Text = string.Empty;
+            ApplyEventsSearch(string.Empty);
 
             // The panel is meaningless without a usable time zero: with none, every row falls back to
             // the raw absolute LSL clock (near-identical, unreadable values) and every click is a
@@ -512,11 +521,46 @@ namespace QuickLook.Plugin.XdfViewer
             _fullChannel = null;
         }
 
+        private void EventsSearchBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            string query = EventsSearchBox.Text;
+            if (EventsSearchPlaceholder != null)
+                EventsSearchPlaceholder.Visibility =
+                    string.IsNullOrEmpty(query) ? Visibility.Visible : Visibility.Collapsed;
+            ApplyEventsSearch(query);
+        }
+
+        /// <summary>Hands the query to <see cref="FullViewEventsFilter"/>, which owns the filtering
+        /// (and is testable without a WPF host); the view then drops the flagged rows.</summary>
+        private void ApplyEventsSearch(string query)
+        {
+            int matches = FullViewEventsFilter.Apply(_fullMarkerVms, query);
+            CollectionViewSource.GetDefaultView(EventsList.ItemsSource)?.Refresh();
+            EventsPanelHeader.Text = FullViewEventsFilter.HeaderText(
+                matches, _fullMarkerVms.Count, _fullMarkersTruncated, query);
+        }
+
         /// <summary>Keyboard nav for the full view: Esc closes; Home/End jump to the start/end of the
         /// stream (keeping the current zoom width). Arrow/+/- are intentionally not bound.</summary>
         private void FullView_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             if (_fullChannel == null) return;
+
+            // This handler tunnels, so it would otherwise swallow keys aimed at the events search box:
+            // Home/End belong to the caret while it has focus, and Esc drops the query before it closes
+            // the view (a second Esc, on an empty box, falls through and closes as usual).
+            if (EventsSearchBox != null && EventsSearchBox.IsKeyboardFocusWithin)
+            {
+                if (e.Key != Key.Escape) return;                       // Home/End move the caret
+                if (!string.IsNullOrEmpty(EventsSearchBox.Text))
+                {
+                    EventsSearchBox.Clear();
+                    e.Handled = true;
+                    return;
+                }
+                // Empty box: fall through, so a second Esc closes the view.
+            }
+
             switch (e.Key)
             {
                 case Key.Escape: CloseFullView(); e.Handled = true; break;
