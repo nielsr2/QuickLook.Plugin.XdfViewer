@@ -40,8 +40,9 @@ front.
 - **Search** — filter channels by name and events by value across every stream, for
   recordings with 100+ channels (e.g. a 144-channel Trigno EMG stream) or hundreds
   of events.
-- **Flat-channel warning** (grey ⚠) for constant/dead channels, and an
-  **incomplete** badge for recordings that were cut short mid-capture.
+- **Flat-channel warning** (grey ⚠) for constant/dead channels, a **counter badge**
+  (grey ⓘ) for sample counters like `nSeq`, and an **incomplete** badge for
+  recordings that were cut short mid-capture.
 - **Bounded cost** — decimated reads, windowed re-reads of only the visible range,
   and a chunk index built once, so memory and load time stay flat regardless of
   recording size.
@@ -79,6 +80,13 @@ memory and load time stay bounded regardless of recording size. Marker
 streams are event streams, not waveforms, so their rows show timestamps/values
 and no sparkline; the events box scrolls horizontally so long event values
 stay readable instead of being clipped at the card edge.
+
+Some acquisition systems put a **sample counter** among the real channels —
+OpenSignals' `nSeq`, for instance — which measures nothing and mostly gets in the
+way. Those are marked with a grey ⓘ, recognized by their shape rather than their
+name: a steady climb, optionally wrapping back to the floor. A counter that wraps
+faster than one sparkline bucket isn't detected, since decimation then leaves it
+looking exactly like a full-scale signal.
 
 ### Full-window view (zoomable)
 
@@ -149,6 +157,12 @@ show "no matching channels" / "no matching events" when everything in them is fi
 out. Event *times* are not searched, since a query like `5` would match most timestamps
 and bury the event names.
 
+The events panel in the full-window view has its own search box, so a long list can be
+narrowed without leaving the plot. It matches event values the same way, and its header
+reads `12 of 500+ events` while a query is active. Non-matching events leave the list
+entirely rather than being greyed out, so stepping through the results can't land on one
+the query is hiding. `Esc` clears the query; a second press closes the view.
+
 ## Shortcuts
 
 **Overview**
@@ -171,12 +185,13 @@ and bury the event names.
 | Horizontal scrollbar | Pan |
 | **Double-click** | Reset — zoom fully out + vertical scale ×1 |
 | **Home** / **End** | Jump to the start / end of the stream |
-| **Esc** | Close the full-window view |
+| **Esc** | Close the full-window view (clears the events search first, if any) |
 | Hover | Crosshair with time + amplitude readout |
 | Vertical scale slider | Amplitude gain about the baseline |
 | Markers selector | Off / Lines / Labels |
 | Events panel toggle tab | Expand/collapse the events list |
 | Click an event in the panel | Centre the plot on it, keeping the current zoom |
+| Type in the events panel's search box | Filter the event list by value |
 
 ## Install
 
@@ -230,6 +245,13 @@ restart QuickLook.
     the panel is hidden entirely rather than showing unusable raw-clock rows.
 20. On the overview card, a marker stream's events box scrolls horizontally when an
     event value is too long to fit.
+21. The events panel's own search box narrows the list to matching values, and its
+    header switches to `N of M events`. **Home**/**End** move the caret while the box has
+    focus instead of jumping the plot; **Esc** clears the query, and a second **Esc**
+    closes the view. Reopening the panel on another channel starts unfiltered.
+22. On an OpenSignals recording, the `nSeq` row carries a grey ⓘ and draws a visible
+    climb rather than a blank strip, while the measured channel beside it is unmarked
+    and unchanged.
 
 ## Test
 
