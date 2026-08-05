@@ -33,8 +33,8 @@ front.
 - **Marker overlay** — marker-stream events drawn as vertical lines on the full view,
   switchable between **Off / Lines / Labels** (Labels by default), with labels staggered
   across up to three rows and collision-skipped so they stay readable at every zoom level.
-- **Events panel** — a collapsible strip in the channel-focus view listing every event, with
-  a click centring the plot on it at the current zoom.
+- **Events panel** — a collapsible strip in the channel-focus view listing the file's
+  events, with a click centring the plot on one at the current zoom.
 - **Search** — filter channels by name and events by value across every stream, for
   recordings with 100+ channels (e.g. a 144-channel Trigno EMG stream) or hundreds
   of events.
@@ -128,11 +128,17 @@ preview), and if a stream has no usable first timestamp the overlay is suppresse
 rather than drawn in the wrong place. The selector is hidden for files with no events.
 
 The full-window view also has a collapsible **events panel** — a toggle tab on the
-right edge that slides a list of every event into view (collapsed by default, so it
+right edge that slides the event list into view (collapsed by default, so it
 doesn't take up space until you want it). Clicking an event centres the plot on it at
 the current zoom level. Like the overlay, the panel is hidden for a channel whose
 stream has no usable first timestamp, since without one every event would render as
 the same near-identical raw clock reading rather than a meaningful relative time.
+
+Marker reads are capped at **500 events per stream**, keeping the preview's cost bounded
+the same way decimated waveform reads do. When a stream hits the cap its count is shown
+with a trailing `+` (`500+ events`) on both the card and the events panel, so a truncated
+list is never presented as complete. This is a preview, not an analysis tool — open the
+file properly if you need every event.
 
 The **search box** in the top-right filters every card at once: channel rows by name,
 and event rows by value — useful for finding one channel in a 144-channel recording,
@@ -217,7 +223,7 @@ restart QuickLook.
     channels" / "no matching events" on the affected cards. Event times are not
     searched — only values.
 19. In the full-window view, the **events panel** toggle tab on the right edge opens
-    a collapsed-by-default list of every event; clicking one centres the plot on it
+    a collapsed-by-default list of the file's events; clicking one centres the plot on it
     without changing the zoom level. For a channel with no usable first timestamp,
     the panel is hidden entirely rather than showing unusable raw-clock rows.
 20. On the overview card, a marker stream's events box scrolls horizontally when an

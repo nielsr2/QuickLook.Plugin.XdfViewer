@@ -397,8 +397,17 @@ namespace QuickLook.Plugin.XdfViewer
             // and the label layout is a single left-to-right pass that mis-skips on unordered input.
             _fullMarkers.Sort((a, b) => a.Timestamp.CompareTo(b.Timestamp));
             bool hasMarkers = _fullMarkers.Count > 0;
+
+            // Without a usable time zero neither marker surface can place an event: UpdateMarkers
+            // suppresses the overlay and EventsList_SelectionChanged refuses to seek. Both the mode
+            // selector and the panel therefore hide on the same condition — leaving the selector up
+            // would offer Off/Lines/Labels over a plot that draws nothing whichever you picked.
+            double panelZero = cvm.StreamFirstTimestamp ?? double.NaN;
+            bool canSeek = !double.IsNaN(panelZero);
+            bool markersUsable = hasMarkers && canSeek;
+
             MarkerModeLabel.Visibility = MarkerModeCombo.Visibility =
-                hasMarkers ? Visibility.Visible : Visibility.Collapsed;
+                markersUsable ? Visibility.Visible : Visibility.Collapsed;
 
             // Events panel rows, on the focused channel's own time basis (null start makes the view
             // model fall back to raw timestamps, exactly as the overview card does).
@@ -415,17 +424,15 @@ namespace QuickLook.Plugin.XdfViewer
                 foreach (var s in _file.Streams)
                     if (s.IsMarkerStream && s.MarkersTruncated) { truncated = true; break; }
             int shownCount = _fullMarkerVms.Count;
-            string countText = shownCount + (truncated ? "+" : "");
-            EventsPanelHeader.Text = countText + (shownCount == 1 && !truncated ? " event" : " events");
+            EventsPanelHeader.Text = shownCount + (truncated ? "+" : "") + " "
+                                   + StreamCardViewModel.Plural(shownCount, truncated, "event");
 
             // The panel is meaningless without a usable time zero: with none, every row falls back to
             // the raw absolute LSL clock (near-identical, unreadable values) and every click is a
             // silent no-op via the guard in EventsList_SelectionChanged. Mirrors UpdateMarkers' own
             // suppression for the same reason — a visible-but-inert panel was rejected; the overview
             // card (file-wide recording start) remains the place to read those events instead.
-            double panelZero = cvm.StreamFirstTimestamp ?? double.NaN;
-            bool canSeek = !double.IsNaN(panelZero);
-            EventsPanel.Visibility = hasMarkers && canSeek ? Visibility.Visible : Visibility.Collapsed;
+            EventsPanel.Visibility = markersUsable ? Visibility.Visible : Visibility.Collapsed;
 
             FullView.Visibility = Visibility.Visible;
             // Grab keyboard focus once the overlay is laid out, so Esc/Home/End work right away.

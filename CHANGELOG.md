@@ -19,6 +19,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Fixed
 - The overview card's events box scrolls horizontally, so long event values are
   readable instead of being clipped at the card edge.
+- Counts of one no longer read "1 events" / "1 channels" on the card or the events
+  panel. A truncated count stays plural, since "500+" means at least 500.
+- The Markers mode selector now hides alongside the events panel for a channel with
+  no usable first timestamp, instead of offering modes over an overlay that suppresses
+  itself either way.
 
 ## [1.0.0] — 2026-07-20
 

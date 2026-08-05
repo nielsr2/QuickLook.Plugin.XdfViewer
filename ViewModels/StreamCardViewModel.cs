@@ -34,8 +34,12 @@ namespace QuickLook.Plugin.XdfViewer.ViewModels
             MarkersTruncated = s.MarkersTruncated;
 
             ExpanderHeader = IsMarkerStream
-                ? (s.Markers.Count > 0 ? $"{s.Markers.Count}{(MarkersTruncated ? "+" : "")} events" : "events")
-                : (s.Channels.Count > 0 ? $"{s.Channels.Count} channels" : "channels");
+                ? (s.Markers.Count > 0
+                    ? $"{s.Markers.Count}{(MarkersTruncated ? "+" : "")} " + Plural(s.Markers.Count, MarkersTruncated, "event")
+                    : "events")
+                : (s.Channels.Count > 0
+                    ? $"{s.Channels.Count} " + Plural(s.Channels.Count, false, "channel")
+                    : "channels");
 
             Kind = StreamKindClassifier.Classify(s);
             KindTooltip = Kind == StreamKind.Generic
@@ -89,6 +93,12 @@ namespace QuickLook.Plugin.XdfViewer.ViewModels
         public void SetNoMarkerMatch(bool value) => NoMarkerMatch = value;
 
         public event PropertyChangedEventHandler PropertyChanged;
+
+        /// <summary>Singularizes a count's noun. A truncated count is always plural: "500+" means at
+        /// least 500 regardless of what the counter reads. Shared with the full view's events-panel
+        /// header so the card and the panel cannot word the same count differently.</summary>
+        internal static string Plural(int count, bool truncated, string noun)
+            => count == 1 && !truncated ? noun : noun + "s";
 
         private static string FormatRate(double hz)
             => (hz >= 1000 ? (hz / 1000.0).ToString("0.###", Ci) + " kHz"

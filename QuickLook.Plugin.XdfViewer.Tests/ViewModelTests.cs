@@ -227,6 +227,56 @@ namespace QuickLook.Plugin.XdfViewer.Tests
             Assert.Equal(42.25, vm.RelativeSeconds, 6);
         }
 
+        [Fact]
+        public void ExpanderHeader_SingularCounts_DropTheS()
+        {
+            var eeg = new XdfStream { Name = "Rig", Type = "EEG", ChannelCount = 1, ChannelFormat = "float32" };
+            eeg.Channels.Add(new XdfChannel { Label = "Fp1", Unit = "uV" });
+            Assert.Equal("1 channel", new StreamCardViewModel(eeg).ExpanderHeader);
+
+            var markers = new XdfStream { Name = "M", Type = "Markers", ChannelCount = 1, ChannelFormat = "string" };
+            markers.Markers.Add(new XdfMarker { Timestamp = 1, Value = "Cross" });
+            Assert.Equal("1 event", new StreamCardViewModel(markers).ExpanderHeader);
+        }
+
+        [Fact]
+        public void ExpanderHeader_PluralCounts_KeepTheS()
+        {
+            var eeg = new XdfStream { Name = "Rig", Type = "EEG", ChannelCount = 2, ChannelFormat = "float32" };
+            eeg.Channels.Add(new XdfChannel { Label = "Fp1", Unit = "uV" });
+            eeg.Channels.Add(new XdfChannel { Label = "Cz", Unit = "uV" });
+            Assert.Equal("2 channels", new StreamCardViewModel(eeg).ExpanderHeader);
+
+            var markers = new XdfStream { Name = "M", Type = "Markers", ChannelCount = 1, ChannelFormat = "string" };
+            markers.Markers.Add(new XdfMarker { Timestamp = 1, Value = "Cross" });
+            markers.Markers.Add(new XdfMarker { Timestamp = 2, Value = "Cross" });
+            Assert.Equal("2 events", new StreamCardViewModel(markers).ExpanderHeader);
+        }
+
+        [Fact]
+        public void ExpanderHeader_TruncatedSingleEvent_StaysPlural()
+        {
+            // "1+" means at least one — possibly many — so the noun must not singularize.
+            var markers = new XdfStream
+            {
+                Name = "M", Type = "Markers", ChannelCount = 1,
+                ChannelFormat = "string", MarkersTruncated = true
+            };
+            markers.Markers.Add(new XdfMarker { Timestamp = 1, Value = "Cross" });
+
+            Assert.Equal("1+ events", new StreamCardViewModel(markers).ExpanderHeader);
+        }
+
+        [Fact]
+        public void ExpanderHeader_EmptyStreams_StayPlural()
+        {
+            var eeg = new XdfStream { Name = "Rig", Type = "EEG", ChannelCount = 0, ChannelFormat = "float32" };
+            Assert.Equal("channels", new StreamCardViewModel(eeg).ExpanderHeader);
+
+            var markers = new XdfStream { Name = "M", Type = "Markers", ChannelCount = 1, ChannelFormat = "string" };
+            Assert.Equal("events", new StreamCardViewModel(markers).ExpanderHeader);
+        }
+
         /// <summary>A file with one EEG stream (Fp1/Cz) and one marker stream carrying
         /// PsychoPy-shaped event values, for the search tests below.</summary>
         private static XdfOverviewViewModel SearchFixture()
