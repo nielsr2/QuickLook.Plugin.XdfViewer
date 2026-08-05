@@ -4,6 +4,29 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- The channel-focus view's events panel has its own search box, so a long event list can
+  be narrowed without leaving the plot. Filtering matches event values, like the overview
+  search; hidden events drop out of the list entirely, so clicking through the results
+  cannot land on one the query is hiding.
+- Counter channels are marked with an ⓘ badge in the channel list. A channel like
+  OpenSignals' `nSeq` counts samples rather than measuring anything, and previously sat
+  in the list looking like data. Counters that wrap are recognized too, as long as they
+  wrap slower than one sparkline bucket — faster than that, decimation leaves nothing to
+  tell them apart from a full-scale signal.
+
+### Changed
+- Channel sparklines join neighbouring buckets whose values don't overlap. A signal that
+  barely moves within a bucket but travels across the whole channel — a sample counter
+  being the extreme case — drew as a row of sub-pixel slivers, or as nothing at all where
+  a bucket held a single sample. Noisy signals are unaffected.
+
+### Fixed
+- `Home`/`End` in the channel-focus view no longer jump the plot while the caret is in a
+  text box; `Esc` there clears the query before a second press closes the view.
+
 ## [1.1.0] — 2026-08-05
 
 ### Added

@@ -5,6 +5,17 @@ using QuickLook.Plugin.XdfViewer.Xdf.Model;
 
 namespace QuickLook.Plugin.XdfViewer.Controls
 {
+    /// <summary>How a bucket's tick joins the previous one in line mode.</summary>
+    internal enum BucketBridge
+    {
+        /// <summary>Ranges overlap: draw the tick on its own, as a comb tooth.</summary>
+        None,
+        /// <summary>Entirely above the previous bucket — join upwards.</summary>
+        Rising,
+        /// <summary>Entirely below the previous bucket — join downwards.</summary>
+        Falling
+    }
+
     /// <summary>
     /// Render-only element that draws a min/max envelope. Two looks:
     ///  - line mode (default): one vertical line per filled bucket, range-autoscaled — compact,
@@ -45,6 +56,10 @@ namespace QuickLook.Plugin.XdfViewer.Controls
             new FrameworkPropertyMetadata(0.0, FrameworkPropertyMetadataOptions.AffectsRender, OnGeometryInputChanged));
 
         private static readonly Brush DefaultLineBrush = Brushes.SteelBlue;
+
+        /// <summary>Shortest tick line mode will draw, so a bucket that varies by almost nothing still
+        /// leaves a mark instead of a zero-length figure.</summary>
+        private const double MinTickPx = 1.0;
 
         private StreamGeometry _cachedGeometry;
         private ChannelEnvelope _geometryEnvelope;
@@ -226,6 +241,10 @@ namespace QuickLook.Plugin.XdfViewer.Controls
         }
 
         // --- Line mode (compact inline sparklines): range-autoscaled vertical ticks. ---
+        // Ticks that don't overlap their neighbour are joined, so a signal whose value barely moves
+        // within a bucket but travels far across the whole channel — a sample counter is the extreme
+        // case — draws as a continuous climb. Left as bare ticks it would be a row of sub-pixel
+        // slivers, and any bucket holding a single sample would draw nothing at all.
         private static StreamGeometry BuildLineGeometry(ChannelEnvelope envelope, double width, double height)
         {
             var geometry = new StreamGeometry();
@@ -234,6 +253,10 @@ namespace QuickLook.Plugin.XdfViewer.Controls
 
             using (var ctx = geometry.Open())
             {
+                bool hasPrev = false;
+                double prevX = 0, prevTop = 0, prevBottom = 0;
+                float prevMin = 0, prevMax = 0;
+
                 for (int b = 0; b < bucketCount; b++)
                 {
                     if (envelope.Filled == null || b >= envelope.Filled.Length || !envelope.Filled[b]) continue;
@@ -248,10 +271,37 @@ namespace QuickLook.Plugin.XdfViewer.Controls
                         continue;
                     }
 
-                    double yMax = MapY(envelope.Max[b], envelope.DataMin, envelope.DataMax, height);
-                    double yMin = MapY(envelope.Min[b], envelope.DataMin, envelope.DataMax, height);
-                    ctx.BeginFigure(new Point(x, yMax), false, false);
-                    ctx.LineTo(new Point(x, yMin), true, false);
+                    double top = MapY(envelope.Max[b], envelope.DataMin, envelope.DataMax, height);
+                    double bottom = MapY(envelope.Min[b], envelope.DataMin, envelope.DataMax, height);
+                    EnsureMinTick(ref top, ref bottom, height, MinTickPx);
+
+                    // Joins the previous *filled* bucket whatever the index gap: chunk striding leaves
+                    // most buckets empty on a long stream, and BuildDotConnector spans those gaps too.
+                    var bridge = hasPrev
+                        ? ClassifyBridge(prevMin, prevMax, envelope.Min[b], envelope.Max[b])
+                        : BucketBridge.None;
+
+                    switch (bridge)
+                    {
+                        case BucketBridge.Rising:
+                            ctx.BeginFigure(new Point(prevX, prevTop), false, false);
+                            ctx.LineTo(new Point(x, bottom), true, false);
+                            ctx.LineTo(new Point(x, top), true, false);
+                            break;
+                        case BucketBridge.Falling:
+                            ctx.BeginFigure(new Point(prevX, prevBottom), false, false);
+                            ctx.LineTo(new Point(x, top), true, false);
+                            ctx.LineTo(new Point(x, bottom), true, false);
+                            break;
+                        default:
+                            ctx.BeginFigure(new Point(x, top), false, false);
+                            ctx.LineTo(new Point(x, bottom), true, false);
+                            break;
+                    }
+
+                    hasPrev = true;
+                    prevX = x; prevTop = top; prevBottom = bottom;
+                    prevMin = envelope.Min[b]; prevMax = envelope.Max[b];
                 }
             }
 
@@ -328,6 +378,37 @@ namespace QuickLook.Plugin.XdfViewer.Controls
 
             geometry.Freeze();
             return geometry;
+        }
+
+        /// <summary>
+        /// Whether a bucket's tick should join the previous one, and in which direction. Buckets whose
+        /// value ranges are disjoint are joined (the signal demonstrably travelled between them);
+        /// overlapping buckets are left as separate ticks, which is what gives a noisy signal its
+        /// characteristic comb. Pure/WPF-free.
+        /// </summary>
+        internal static BucketBridge ClassifyBridge(float prevMin, float prevMax, float curMin, float curMax)
+        {
+            if (curMin >= prevMax) return BucketBridge.Rising;
+            if (curMax <= prevMin) return BucketBridge.Falling;
+            return BucketBridge.None;
+        }
+
+        /// <summary>
+        /// Grows a tick to at least <paramref name="minPx"/> about its midpoint, then nudges it inside
+        /// [0, height]. Without this a bucket holding a single sample has min == max and draws as a
+        /// zero-length figure — nothing at all under a flat line cap. Pure/WPF-free.
+        /// </summary>
+        internal static void EnsureMinTick(ref double yTop, ref double yBottom, double height, double minPx)
+        {
+            if (yBottom - yTop >= minPx) return;
+
+            double mid = (yTop + yBottom) / 2;
+            yTop = mid - minPx / 2;
+            yBottom = mid + minPx / 2;
+
+            if (yTop < 0) { yBottom -= yTop; yTop = 0; }
+            if (yBottom > height) { yTop -= yBottom - height; yBottom = height; }
+            if (yTop < 0) yTop = 0;                 // height below minPx: keep the top edge on-canvas
         }
 
         /// <summary>True once the horizontal zoom reaches ~1 sample/bucket wide enough to show discrete

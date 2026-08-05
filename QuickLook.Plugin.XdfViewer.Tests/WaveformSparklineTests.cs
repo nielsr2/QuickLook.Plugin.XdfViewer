@@ -222,5 +222,100 @@ namespace QuickLook.Plugin.XdfViewer.Tests
         {
             Assert.False(WaveformSparkline.UseSampleDots(0, 1000d, 6d));
         }
+
+        // --- Bucket bridging: what keeps a slow ramp from drawing as invisible slivers ---
+
+        [Fact]
+        public void ClassifyBridge_CurrentAbovePrevious_ReturnsRising()
+        {
+            Assert.Equal(BucketBridge.Rising, WaveformSparkline.ClassifyBridge(0f, 1f, 2f, 3f));
+        }
+
+        [Fact]
+        public void ClassifyBridge_CurrentBelowPrevious_ReturnsFalling()
+        {
+            Assert.Equal(BucketBridge.Falling, WaveformSparkline.ClassifyBridge(2f, 3f, 0f, 1f));
+        }
+
+        [Fact]
+        public void ClassifyBridge_OverlappingRanges_ReturnsNone()
+        {
+            // A signal that swings within each bucket keeps the disconnected-tick look.
+            Assert.Equal(BucketBridge.None, WaveformSparkline.ClassifyBridge(0f, 2f, 1f, 3f));
+        }
+
+        [Fact]
+        public void ClassifyBridge_TouchingRanges_ReturnsRising()
+        {
+            // A counter's buckets meet exactly at the boundary; that still counts as a climb.
+            Assert.Equal(BucketBridge.Rising, WaveformSparkline.ClassifyBridge(0f, 1f, 1f, 2f));
+        }
+
+        // --- Minimum tick length: a single-sample bucket has min == max and would draw nothing ---
+
+        [Fact]
+        public void EnsureMinTick_TickShorterThanMinimum_ExpandsSymmetrically()
+        {
+            double top = 10d, bottom = 10.4d;
+
+            WaveformSparkline.EnsureMinTick(ref top, ref bottom, 100d, 1d);
+
+            Assert.Equal(9.7d, top, 6);
+            Assert.Equal(10.7d, bottom, 6);
+        }
+
+        [Fact]
+        public void EnsureMinTick_ZeroLengthTick_ExpandsToMinimum()
+        {
+            double top = 50d, bottom = 50d;
+
+            WaveformSparkline.EnsureMinTick(ref top, ref bottom, 100d, 1d);
+
+            Assert.Equal(1d, bottom - top, 6);
+        }
+
+        [Fact]
+        public void EnsureMinTick_TickLongerThanMinimum_Unchanged()
+        {
+            double top = 10d, bottom = 40d;
+
+            WaveformSparkline.EnsureMinTick(ref top, ref bottom, 100d, 1d);
+
+            Assert.Equal(10d, top);
+            Assert.Equal(40d, bottom);
+        }
+
+        [Fact]
+        public void EnsureMinTick_NearTopEdge_ShiftsInsideBounds()
+        {
+            double top = 0d, bottom = 0d;
+
+            WaveformSparkline.EnsureMinTick(ref top, ref bottom, 100d, 1d);
+
+            Assert.Equal(0d, top, 6);
+            Assert.Equal(1d, bottom, 6);
+        }
+
+        [Fact]
+        public void EnsureMinTick_NearBottomEdge_ShiftsInsideBounds()
+        {
+            double top = 100d, bottom = 100d;
+
+            WaveformSparkline.EnsureMinTick(ref top, ref bottom, 100d, 1d);
+
+            Assert.Equal(99d, top, 6);
+            Assert.Equal(100d, bottom, 6);
+        }
+
+        [Fact]
+        public void EnsureMinTick_HeightSmallerThanMinimum_StaysWithinHeight()
+        {
+            double top = 0.2d, bottom = 0.2d;
+
+            WaveformSparkline.EnsureMinTick(ref top, ref bottom, 0.5d, 1d);
+
+            Assert.Equal(0d, top, 6);
+            Assert.True(bottom <= 1d);
+        }
     }
 }

@@ -157,6 +157,65 @@ namespace QuickLook.Plugin.XdfViewer.Tests
             Assert.False(vm.IsFlat);
         }
 
+        /// <summary>A sample counter (nSeq-shaped): a straight climb, one step per bucket.</summary>
+        private static ChannelEnvelope MakeCounterEnvelope()
+        {
+            const int n = 12;
+            var min = new float[n];
+            var max = new float[n];
+            var filled = new bool[n];
+            for (int b = 0; b < n; b++) { min[b] = b; max[b] = b + 0.9f; filled[b] = true; }
+
+            return new ChannelEnvelope
+            {
+                Min = min, Max = max, Filled = filled, BucketCount = n,
+                DataMin = 0f, DataMax = n - 1 + 0.9f
+            };
+        }
+
+        [Fact]
+        public void IsCounter_FalseWhenNoSparkline()
+        {
+            var vm = new ChannelViewModel(new XdfChannel { Label = "nSeq" }, new XdfStream());
+            Assert.False(vm.IsCounter);
+        }
+
+        [Fact]
+        public void IsCounter_TrueForMonotonicRamp_RaisesPropertyChanged()
+        {
+            var channel = new XdfChannel { Label = "nSeq" };
+            var vm = new ChannelViewModel(channel, new XdfStream());
+            var raised = CapturePropertyChanges(vm);
+
+            vm.ApplyEnvelope(MakeCounterEnvelope());
+
+            Assert.True(vm.IsCounter);
+            Assert.Contains(nameof(ChannelViewModel.IsCounter), raised);
+        }
+
+        [Fact]
+        public void IsCounter_FalseForFlatChannel()
+        {
+            var channel = new XdfChannel { Label = "accX" };
+            var vm = new ChannelViewModel(channel, new XdfStream());
+
+            vm.ApplyEnvelope(MakeFlatEnvelope());
+
+            Assert.False(vm.IsCounter);
+            Assert.True(vm.IsFlat);            // the two badges are mutually exclusive
+        }
+
+        [Fact]
+        public void IsCounter_FalseForNoisyChannel()
+        {
+            var channel = new XdfChannel { Label = "RESPIRATION0" };
+            var vm = new ChannelViewModel(channel, new XdfStream());
+
+            vm.ApplyEnvelope(MakeEnvelope(empty: false));
+
+            Assert.False(vm.IsCounter);
+        }
+
         [Fact]
         public void IsExpanded_SetTrue_RaisesPropertyChanged()
         {

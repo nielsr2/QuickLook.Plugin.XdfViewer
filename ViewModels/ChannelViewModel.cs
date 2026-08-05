@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using QuickLook.Plugin.XdfViewer.Xdf;
 using QuickLook.Plugin.XdfViewer.Xdf.Model;
 
 namespace QuickLook.Plugin.XdfViewer.ViewModels
@@ -55,6 +56,7 @@ namespace QuickLook.Plugin.XdfViewer.ViewModels
                 Raise(nameof(Sparkline));
                 Raise(nameof(HasWaveform));
                 Raise(nameof(IsFlat));
+                Raise(nameof(IsCounter));
             }
         }
 
@@ -87,6 +89,15 @@ namespace QuickLook.Plugin.XdfViewer.ViewModels
         /// grey warning marker in the channel row.
         /// </summary>
         public bool IsFlat => Sparkline != null && !Sparkline.IsEmpty && Sparkline.DataMax <= Sparkline.DataMin;
+
+        /// <summary>
+        /// True when the channel is a sample counter rather than a measured signal — a value that
+        /// climbs with the sample index (wrapping or not), as OpenSignals' "nSeq" does. Drives the
+        /// badge in the channel row. Mutually exclusive with <see cref="IsFlat"/>, which needs a
+        /// constant value.
+        /// </summary>
+        public bool IsCounter => Sparkline != null && !Sparkline.IsEmpty
+                              && CounterChannelDetector.IsSampleCounter(Sparkline);
 
         public bool IsExpanded
         {

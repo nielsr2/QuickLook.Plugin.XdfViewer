@@ -152,6 +152,13 @@
                                     VerticalAlignment="Center" Margin="8,0,0,0"
                                     ToolTip="Flat channel — a constant value throughout the previewed data (often a disconnected or unused sensor)."
                                     Visibility="{Binding IsFlat, Converter={StaticResource BoolToVis}}"/>
+                                  <!-- Counter-channel badge. Shares the flat glyph's column: a counter
+                                       has to climb and a flat channel cannot, so the two never coincide. -->
+                                  <TextBlock Grid.Column="1" Text="&#x24D8;"
+                                    FontFamily="Segoe UI Symbol" FontSize="12" Foreground="#9A9A9A"
+                                    VerticalAlignment="Center" Margin="8,0,0,0"
+                                    ToolTip="Counter channel — counts samples (e.g. nSeq), climbing steadily and wrapping back to its floor, rather than carrying a measured signal."
+                                    Visibility="{Binding IsCounter, Converter={StaticResource BoolToVis}}"/>
                                   <controls:WaveformSparkline Grid.Column="2" Height="16" Margin="8,0,0,0"
                                     HorizontalAlignment="Stretch" VerticalAlignment="Center"
                                     Envelope="{Binding Sparkline}"
