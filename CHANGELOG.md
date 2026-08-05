@@ -4,21 +4,34 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.0] — Unreleased
+## [1.1.0] — 2026-08-05
 
 ### Added
 - Collapsible events panel in the channel-focus view: browse the file's events and
   click one to centre the plot on it, keeping the current zoom.
+- The search box filters events by value alongside channels by label, using the same
+  query, so a file whose interesting content is its events is searchable at all. Marker
+  cards report "no matching events" when a query clears them, and the box now appears
+  for marker-only files. Event times are deliberately not searched — a query like "5"
+  matches most timestamps and buries the names the box exists to find.
 
 ### Changed
 - Marker overlay defaults to `Labels` instead of `Lines`.
 - Marker labels are staggered across three rows and skip any label that would overlap
   a neighbour, so they stay readable at every zoom level; zooming in reveals more.
 - Events are ordered chronologically across all marker streams.
+- Channel sparklines scale with the card instead of staying pinned at 100 px, so a wider
+  window grows the waveform rather than the label column. Labels trim, with the full
+  name and unit on hover.
 
 ### Fixed
 - The overview card's events box scrolls horizontally, so long event values are
   readable instead of being clipped at the card edge.
+- Trackpad horizontal scroll reaches the card's events box and the full view's events
+  panel, whose horizontal scrollbars were previously drag-only.
+- Time-axis labels take their precision from the tick step rather than the magnitude of
+  the timestamp, so a zoomed-in window past 100 s no longer labels every tick with the
+  same whole second.
 - Counts of one no longer read "1 events" / "1 channels" on the card or the events
   panel. A truncated count stays plural, since "500+" means at least 500.
 - The Markers mode selector now hides alongside the events panel for a channel with
