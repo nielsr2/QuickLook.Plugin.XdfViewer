@@ -85,9 +85,12 @@ namespace QuickLook.Plugin.XdfViewer
         private bool _navigatingToEvent;             // re-entrancy guard while clearing SelectedItem
         private bool _fullMarkersTruncated;          // any marker stream hit the per-stream read cap
 
-        // Amber reads clearly over the waveform on both light and dark themes.
+        // Amber reads clearly over the waveform on both light and dark themes, so marker
+        // lines/arrowheads keep this single color. The label chips sit on their own backdrop,
+        // so their fg/bg pair is theme-resolved instead (set by ApplyPalette).
         private static readonly Brush MarkerBrush = Frozen(Color.FromRgb(0xE0, 0x8E, 0x2A));
-        private static readonly Brush MarkerLabelBg = Frozen(Color.FromArgb(0x99, 0, 0, 0));
+        private Brush _markerLabelBg = Frozen(ThemePalette.Dark.MarkerLabelBackground);
+        private Brush _markerLabelFg = Frozen(ThemePalette.Dark.MarkerLabelForeground);
         private static Brush Frozen(Color c) { var b = new SolidColorBrush(c); b.Freeze(); return b; }
 
         // Last theme passed to ApplyTheme, so a color-theme change can re-derive WaveformBrush
@@ -102,11 +105,12 @@ namespace QuickLook.Plugin.XdfViewer
             Resources.Add("BoolToVis", new BooleanToVisibilityConverter());
             Resources.Add("InverseBoolToVis", new InverseBooleanToVisibilityConverter());
             Resources.Add("KindToGeometry", new QuickLook.Plugin.XdfViewer.Resources.StreamKindToGeometryConverter());
-            // Opaque backdrop for the full-window overlay so the cards behind it are hidden.
-            // Overridden per-theme in ApplyTheme; this dark default covers Themes.None.
-            Resources["PanelBackground"] = new SolidColorBrush(Color.FromRgb(0x1E, 0x1E, 0x1E));
+            // Seed every theme-keyed resource before InitializeComponent so no DynamicResource
+            // consumer is ever left unset; ApplyTheme re-resolves the palette from the host theme
+            // (and, for Themes.None, from the OS app theme).
+            ApplyPalette(ThemePalette.Dark);
             // Neutral default so the DynamicResource-bound stream-kind icon isn't left unfilled
-            // (and thus invisible) under Themes.None, where ApplyTheme never registers this key.
+            // (and thus invisible) in the window before ApplyTheme runs.
             Resources["WaveformBrush"] = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88));
             InitializeComponent();
             InitSettingsControls();
@@ -728,8 +732,8 @@ namespace QuickLook.Plugin.XdfViewer
                 {
                     var tb = new TextBlock
                     {
-                        Text = TruncateLabel(m.Value), FontSize = 9, Foreground = MarkerBrush,
-                        Background = MarkerLabelBg, Padding = new Thickness(2, 0, 2, 0)
+                        Text = TruncateLabel(m.Value), FontSize = 9, Foreground = _markerLabelFg,
+                        Background = _markerLabelBg, Padding = new Thickness(2, 0, 2, 0)
                     };
                     tb.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
                     labelBlocks.Add(tb);
@@ -1128,34 +1132,40 @@ namespace QuickLook.Plugin.XdfViewer
         {
             _currentTheme = theme;   // remembered so a later color-theme change can re-derive WaveformBrush
 
+            // Themes.None — ContextObject.Theme's default, and this plugin's common real-world
+            // runtime state (not every host sets a theme before View() runs) — resolves from the
+            // OS app theme, so the panel matches what Windows actually shows instead of assuming
+            // dark. Explicit Dark/Light from the host always wins over the OS flag.
+            var palette = ThemePalette.Resolve(theme, QuickLook.Common.Helpers.OSThemeHelper.AppsUseDarkTheme());
+
             // Set an explicit foreground so text stays readable regardless of the host chrome.
-            // WaveformBrush is derived separately below: Foreground (plain text legibility) must
+            // WaveformBrush is derived separately: Foreground (plain text legibility) must
             // never be affected by the waveform color-theme choice.
-            if (theme == QuickLook.Common.Plugin.Themes.Dark)
-            {
-                var neutral = new SolidColorBrush(Color.FromRgb(0xEC, 0xEC, 0xEC));
-                Foreground = neutral;
-                Resources["WaveformBrush"] = ResolveWaveformBrush(neutral);
-                Resources["PanelBackground"] = new SolidColorBrush(Color.FromRgb(0x1E, 0x1E, 0x1E));
-            }
-            else if (theme == QuickLook.Common.Plugin.Themes.Light)
-            {
-                var neutral = new SolidColorBrush(Color.FromRgb(0x1A, 0x1A, 0x1A));
-                Foreground = neutral;
-                Resources["WaveformBrush"] = ResolveWaveformBrush(neutral);
-                Resources["PanelBackground"] = new SolidColorBrush(Color.FromRgb(0xF5, 0xF5, 0xF5));
-            }
-            else
-            {
-                // Themes.None: leave Foreground/PanelBackground at their inherited/constructor
-                // defaults, as before. But this is this plugin's common real-world runtime state
-                // (ContextObject.Theme defaults to None, and not every host explicitly overrides it
-                // before View() runs) rather than a rare edge case, so the waveform color-theme
-                // picker must still work here — recompute WaveformBrush too, falling back to the
-                // same neutral gray the constructor seeds it with when no theme is chosen.
-                var neutral = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88));
-                Resources["WaveformBrush"] = ResolveWaveformBrush(neutral);
-            }
+            var neutral = new SolidColorBrush(palette.NeutralForeground);
+            Foreground = neutral;
+            Resources["WaveformBrush"] = ResolveWaveformBrush(neutral);
+            ApplyPalette(palette);
+            // Marker label chips are plain TextBlocks built in code, so they don't follow
+            // DynamicResource swaps — rebuild them (safe: UpdateMarkers guards null/empty state).
+            UpdateMarkers();
+        }
+
+        /// <summary>Publishes a palette to every theme-keyed DynamicResource, plus the two
+        /// marker-label brushes consumed from code-behind in UpdateMarkers.</summary>
+        private void ApplyPalette(ThemePalette p)
+        {
+            Resources["PanelBackground"] = Frozen(p.PanelBackground);
+            Resources["OverlayChipBackground"] = Frozen(p.OverlayChipBackground);
+            Resources["OverlayChipForeground"] = Frozen(p.OverlayChipForeground);
+            Resources["SampleBadgeBackground"] = Frozen(p.SampleBadgeBackground);
+            Resources["SampleBadgeForeground"] = Frozen(p.SampleBadgeForeground);
+            Resources["MinimapBackground"] = Frozen(p.MinimapBackground);
+            Resources["MinimapViewportFill"] = Frozen(p.MinimapViewportFill);
+            Resources["MinimapViewportStroke"] = Frozen(p.MinimapViewportStroke);
+            Resources["SecondaryForeground"] = Frozen(p.SecondaryForeground);
+            Resources["MutedGlyphForeground"] = Frozen(p.MutedGlyphForeground);
+            _markerLabelBg = Frozen(p.MarkerLabelBackground);
+            _markerLabelFg = Frozen(p.MarkerLabelForeground);
         }
 
         /// <summary>Mono reproduces today's exact behavior (accent == neutral foreground); the other

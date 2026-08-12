@@ -28,8 +28,8 @@
             <StackPanel>
               <TextBlock Text="WAVEFORM COLOR" FontSize="10" Opacity="0.6" Margin="0,0,0,6"/>
               <!-- Item order MUST exactly match the WaveformColorTheme enum declaration order
-                   (Mono, Ocean, Sunset, Forest, Berry, Custom): SelectedIndex is cast straight
-                   to the enum in code-behind. -->
+                   (Mono, Ocean, Sunset, Forest, Berry, Purple, Custom): SelectedIndex is cast
+                   straight to the enum in code-behind. -->
               <ComboBox x:Name="WaveformThemeCombo" Width="160" SelectionChanged="WaveformThemeCombo_SelectionChanged">
                 <ComboBoxItem>Mono</ComboBoxItem>
                 <ComboBoxItem>Ocean</ComboBoxItem>
@@ -143,19 +143,19 @@
                                              TextTrimming="CharacterEllipsis"
                                              ToolTip="{Binding LabelWithUnit}">
                                     <Run Text="{Binding Label, Mode=OneWay}"/>
-                                    <Run Text="{Binding Unit, Mode=OneWay}" FontStyle="Italic" Foreground="#888"/>
+                                    <Run Text="{Binding Unit, Mode=OneWay}" FontStyle="Italic" Foreground="{DynamicResource SecondaryForeground}"/>
                                   </TextBlock>
                                   <!-- Flat-channel warning: sits just left of the sparkline. Auto column, so it
                                        costs nothing on the (usual) rows where it is collapsed. -->
                                   <TextBlock Grid.Column="1" Text="&#x26A0;&#xFE0E;"
-                                    FontFamily="Segoe UI Symbol" FontSize="12" Foreground="#9A9A9A"
+                                    FontFamily="Segoe UI Symbol" FontSize="12" Foreground="{DynamicResource MutedGlyphForeground}"
                                     VerticalAlignment="Center" Margin="8,0,0,0"
                                     ToolTip="Flat channel — a constant value throughout the previewed data (often a disconnected or unused sensor)."
                                     Visibility="{Binding IsFlat, Converter={StaticResource BoolToVis}}"/>
                                   <!-- Counter-channel badge. Shares the flat glyph's column: a counter
                                        has to climb and a flat channel cannot, so the two never coincide. -->
                                   <TextBlock Grid.Column="1" Text="&#x24D8;"
-                                    FontFamily="Segoe UI Symbol" FontSize="12" Foreground="#9A9A9A"
+                                    FontFamily="Segoe UI Symbol" FontSize="12" Foreground="{DynamicResource MutedGlyphForeground}"
                                     VerticalAlignment="Center" Margin="8,0,0,0"
                                     ToolTip="Counter channel — counts samples (e.g. nSeq), climbing steadily and wrapping back to its floor, rather than carrying a measured signal."
                                     Visibility="{Binding IsCounter, Converter={StaticResource BoolToVis}}"/>
@@ -218,7 +218,7 @@
                             <TextBlock Opacity="0.85" ToolTip="{Binding Value}"
                                        Visibility="{Binding IsFilteredOut,
                                          Converter={StaticResource InverseBoolToVis}}">
-                              <Run Text="{Binding TimeLabel, Mode=OneWay}" Foreground="#888"/>
+                              <Run Text="{Binding TimeLabel, Mode=OneWay}" Foreground="{DynamicResource SecondaryForeground}"/>
                               <Run Text="  "/>
                               <Run Text="{Binding Value, Mode=OneWay}"/>
                             </TextBlock>
@@ -266,7 +266,7 @@
           <!-- Minimap navigator: whole-channel overview + draggable viewport rect -->
           <Border x:Name="Minimap" DockPanel.Dock="Right" Width="200" Height="46"
                   Margin="12,0,0,0" VerticalAlignment="Center" CornerRadius="4"
-                  Background="#40000000" BorderBrush="#55888888" BorderThickness="1"
+                  Background="{DynamicResource MinimapBackground}" BorderBrush="#55888888" BorderThickness="1"
                   Cursor="Hand"
                   MouseLeftButtonDown="Mini_MouseLeftButtonDown"
                   MouseMove="Mini_MouseMove"
@@ -278,7 +278,7 @@
                          LineBrush="{DynamicResource WaveformBrush}"
                          SizeChanged="MiniWave_SizeChanged"/>
               <Canvas>
-                <Rectangle x:Name="MiniViewport" Fill="#26FFFFFF" Stroke="#AAFFFFFF"
+                <Rectangle x:Name="MiniViewport" Fill="{DynamicResource MinimapViewportFill}" Stroke="{DynamicResource MinimapViewportStroke}"
                            StrokeThickness="1"/>
               </Canvas>
             </Grid>
@@ -349,7 +349,7 @@
               <ListBox.ItemTemplate>
                 <DataTemplate>
                   <TextBlock Opacity="0.85" FontSize="11" ToolTip="{Binding Value}">
-                    <Run Text="{Binding TimeLabel, Mode=OneWay}" Foreground="#888"/>
+                    <Run Text="{Binding TimeLabel, Mode=OneWay}" Foreground="{DynamicResource SecondaryForeground}"/>
                     <Run Text="  "/>
                     <Run Text="{Binding Value, Mode=OneWay}"/>
                   </TextBlock>
@@ -402,15 +402,15 @@
                     Stroke="{DynamicResource WaveformBrush}"/>
               <Line x:Name="CrosshairH" StrokeThickness="1" StrokeDashArray="3 3" Opacity="0.55"
                     Stroke="{DynamicResource WaveformBrush}"/>
-              <Border x:Name="CrosshairReadout" Background="#CC000000" CornerRadius="3" Padding="5,2">
-                <TextBlock x:Name="CrosshairText" FontSize="10" Foreground="White"/>
+              <Border x:Name="CrosshairReadout" Background="{DynamicResource OverlayChipBackground}" CornerRadius="3" Padding="5,2">
+                <TextBlock x:Name="CrosshairText" FontSize="10" Foreground="{DynamicResource OverlayChipForeground}"/>
               </Border>
             </Canvas>
             <!-- Sample-accurate indicator (top-left), shown once zoom reaches ~1 sample/bucket -->
             <Border x:Name="SampleBadge" Visibility="Collapsed"
                     HorizontalAlignment="Left" VerticalAlignment="Top" Margin="6,6,0,0"
-                    Background="#663FB950" CornerRadius="3" Padding="6,2">
-              <TextBlock x:Name="SampleBadgeText" FontSize="10" Foreground="White"/>
+                    Background="{DynamicResource SampleBadgeBackground}" CornerRadius="3" Padding="6,2">
+              <TextBlock x:Name="SampleBadgeText" FontSize="10" Foreground="{DynamicResource SampleBadgeForeground}"/>
             </Border>
           </Grid>
           <!-- Time (X) axis for the visible window -->
