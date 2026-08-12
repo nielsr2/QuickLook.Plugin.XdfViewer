@@ -24,6 +24,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   a bucket held a single sample. Noisy signals are unaffected.
 
 ### Fixed
+- The light theme now reaches every surface. The crosshair readout, the sample-accurate
+  badge, marker value labels, and the minimap with its viewport rectangle were hardcoded
+  for dark backgrounds — white text and translucent black chips that washed out or
+  vanished on a light panel. Each now carries a light/dark pair (dark is pixel-identical
+  to before), and the secondary grays — unit suffixes, event timestamps, and the ⚠/ⓘ
+  channel glyphs — darken slightly on light so they stay comfortably readable.
+- When the host doesn't state a theme (QuickLook's default), the panel previously assumed
+  dark. It now follows the Windows app theme, so a light-mode machine gets a light preview.
+  An explicit theme from the host still wins.
 - `Home`/`End` in the channel-focus view no longer jump the plot while the caret is in a
   text box; `Esc` there clears the query before a second press closes the view.
 
