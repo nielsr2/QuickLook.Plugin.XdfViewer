@@ -85,7 +85,7 @@ namespace QuickLook.Plugin.XdfViewer.Xdf
                 if (!s.SampleCount.HasValue)
                 {
                     if (s.TalliedSampleCount > 0) s.SampleCount = s.TalliedSampleCount;
-                    s.IsIncomplete = true; // no footer was seen
+                    s.IsIncomplete = !s.HasFooter; // a footer without <sample_count> is still a complete stream
                 }
                 file.Streams.Add(s);
             }
@@ -343,6 +343,7 @@ namespace QuickLook.Plugin.XdfViewer.Xdf
             s.ChannelCount = ParseInt(info.Element("channel_count"), 0);
             s.NominalSampleRate = ParseDouble(info.Element("nominal_srate"), 0);
 
+            s.Channels.Clear(); // a repeated header for the same id replaces the channel list, never appends
             var channels = info.Element("desc")?.Element("channels");
             if (channels != null)
             {
@@ -354,6 +355,12 @@ namespace QuickLook.Plugin.XdfViewer.Xdf
                         Type = (string)ch.Element("type")
                     });
             }
+
+            // channel_count is what the samples carry; the channel list is only descriptive. A missing
+            // count falls back to the list, and a list longer than the count is cut so every row maps
+            // to a decoded channel.
+            if (s.ChannelCount <= 0) s.ChannelCount = s.Channels.Count;
+            else if (s.Channels.Count > s.ChannelCount) s.Channels.RemoveRange(s.ChannelCount, s.Channels.Count - s.ChannelCount);
 
             // Some outlets (e.g. g.tec Unicorn) write an empty <desc /> or a partial channel list. The
             // samples still carry channel_count values, so pad up to it (capped like envelope building)
@@ -372,6 +379,7 @@ namespace QuickLook.Plugin.XdfViewer.Xdf
             uint id = reader.ReadUInt32();
             var info = SafeRootInfo(ReadXml(reader, contentEnd));
             var s = GetOrAdd(streams, order, id);
+            s.HasFooter = true;
             if (info == null) return;
 
             var first = info.Element("first_timestamp");

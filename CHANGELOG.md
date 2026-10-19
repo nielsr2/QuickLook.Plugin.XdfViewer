@@ -11,6 +11,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Unicorn LSL outlet) or only some of them now show one row per declared channel, with
   waveforms. Before this, the channels section stayed empty. Channels without a label are
   named `ch 1`, `ch 2`, ….
+- A header that lists more channels than its `channel_count` no longer adds rows that
+  can never get a waveform. A header with no `channel_count` takes the count from its
+  channel list, so the stream still shows waveforms.
+- A repeated stream header for the same stream no longer shows every channel twice.
+- A stream whose footer has no `sample_count` is no longer flagged as incomplete.
 
 ## [1.2.0] — 2026-08-12
 

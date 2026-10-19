@@ -19,6 +19,9 @@ namespace QuickLook.Plugin.XdfViewer.Xdf.Model
         /// <summary>Sample count summed from Samples chunks; fallback when no footer.</summary>
         public long TalliedSampleCount { get; set; }
 
+        /// <summary>True once a StreamFooter chunk was seen, even one missing some fields.</summary>
+        public bool HasFooter { get; set; }
+
         public bool IsIncomplete { get; set; }
         public bool MarkersTruncated { get; set; }
 
