@@ -1,6 +1,8 @@
 # QuickLook.Plugin.XdfViewer
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Platform: Windows](https://img.shields.io/badge/platform-Windows-0078D6?logo=windows&logoColor=white)](#download)
+[![Also on macOS](https://img.shields.io/badge/also_on-macOS-000000?logo=apple&logoColor=white)](https://github.com/nielsr2/macos-quicklook-xdf-viewer)
 
 A [QuickLook](https://github.com/QL-Win/QuickLook) plugin that previews **XDF**
 (Extensible Data Format) recordings — the format written by
@@ -10,6 +12,10 @@ Space in Explorer on a `.xdf` file to get an instant, high-level overview of
 every stream (EEG, ECG, EMG, respiration, accelerometer, markers, and more),
 plus zoomable per-channel waveforms — without loading the raw sample data up
 front.
+
+> [!TIP]
+> **On a Mac?** There's a native macOS Quick Look version too:
+> 🍎 **[macos-quicklook-xdf-viewer](https://github.com/nielsr2/macos-quicklook-xdf-viewer)**
 
 ![Demo: pressing Space in Explorer on an XDF file opens the overview instantly — one card per stream, with per-channel sparklines and a scrollable events list. Clicking a channel opens the full-window view, where the plot zooms to individual samples, marker labels stagger across rows above the trace, a crosshair reads out time and amplitude under the pointer, and a side panel lists the file's events. The waveform color theme is switched from the settings flyout at the end.](assets/demo.gif)
 
@@ -52,6 +58,10 @@ front.
 
 Grab the latest `QuickLook.Plugin.XdfViewer.qlplugin` from the
 [**Releases**](../../releases) page, then open it with QuickLook (see [Install](#install)).
+
+> 🍎 **macOS users:** this plugin is Windows-only. Use
+> [**macos-quicklook-xdf-viewer**](https://github.com/nielsr2/macos-quicklook-xdf-viewer)
+> instead.
 
 ## Build from source
 
