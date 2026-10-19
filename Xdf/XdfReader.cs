@@ -24,14 +24,17 @@ namespace QuickLook.Plugin.XdfViewer.Xdf
         public const int MaxEnvelopeChannels = 4_096;
         private static readonly byte[] Magic = { 0x58, 0x44, 0x46, 0x3A }; // "XDF:"
 
-        public static XdfFile Read(string path)
+        /// <param name="regularTextAsEvents">Show text streams with a nominal rate &gt; 0 as events, like
+        /// irregular marker streams (see <see cref="XdfStream.RegularTextAsEvents"/>).</param>
+        public static XdfFile Read(string path, bool regularTextAsEvents = true)
         {
             using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read,
                                            1 << 16, FileOptions.SequentialScan))
-                return Read(fs);
+                return Read(fs, regularTextAsEvents);
         }
 
-        public static XdfFile Read(Stream stream)
+        /// <summary>See <see cref="Read(string, bool)"/>.</summary>
+        public static XdfFile Read(Stream stream, bool regularTextAsEvents = true)
         {
             var reader = new BinaryReader(stream, Encoding.UTF8, leaveOpen: true);
 
@@ -69,7 +72,7 @@ namespace QuickLook.Plugin.XdfViewer.Xdf
                             ParseStreamFooter(reader, contentEnd, streams, order);
                             break;
                         case XdfChunkTag.Samples:
-                            ParseSamples(reader, contentEnd, streams, order);
+                            ParseSamples(reader, contentEnd, streams, order, regularTextAsEvents);
                             break;
                         // ClockOffset/Boundary: handled in later tasks or skipped.
                     }
@@ -82,6 +85,7 @@ namespace QuickLook.Plugin.XdfViewer.Xdf
             foreach (var id in order)
             {
                 var s = streams[id];
+                s.RegularTextAsEvents = regularTextAsEvents; // also streams that never had a Samples chunk
                 if (!s.SampleCount.HasValue)
                 {
                     if (s.TalliedSampleCount > 0) s.SampleCount = s.TalliedSampleCount;
@@ -394,11 +398,12 @@ namespace QuickLook.Plugin.XdfViewer.Xdf
         }
 
         private static void ParseSamples(BinaryReader reader, long contentEnd,
-            Dictionary<uint, XdfStream> streams, List<uint> order)
+            Dictionary<uint, XdfStream> streams, List<uint> order, bool regularTextAsEvents)
         {
             uint id = reader.ReadUInt32();
             long numSamples = reader.ReadVarLength();
             var s = GetOrAdd(streams, order, id);
+            s.RegularTextAsEvents = regularTextAsEvents; // decides IsMarkerStream just below
             s.TalliedSampleCount += numSamples;
 
             if (!s.IsMarkerStream) return; // never decode numeric sample values
@@ -409,6 +414,9 @@ namespace QuickLook.Plugin.XdfViewer.Xdf
                 byte tsMarker = reader.ReadByte();
                 double ts = double.NaN;
                 if (tsMarker == 8) ts = reader.ReadDouble();
+                else if (s.NominalSampleRate > 0 && !double.IsNaN(s.LastMarkerTimestamp))
+                    ts = s.LastMarkerTimestamp + 1.0 / s.NominalSampleRate;
+                s.LastMarkerTimestamp = ts;
 
                 string value = null;
                 int channelCount = s.ChannelCount > 0 ? s.ChannelCount : 1;

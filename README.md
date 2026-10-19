@@ -118,6 +118,11 @@ uncommon, since LabRecorder chunks periodically.)
 
 ## Markers & search
 
+Text streams (`channel_format` "string") are listed as events. That includes text
+streams that declare a sample rate, since they have no numeric data to plot. To show
+those as plain streams instead, untick **Show sampled text streams as events** in the
+settings flyout (gear icon); the preview re-reads the file straight away.
+
 Marker-stream events can be drawn over the full-window plot as vertical lines, so
 you can see where events fall relative to the signal. The **Markers** selector in
 the settings row switches between:
@@ -256,6 +261,16 @@ restart QuickLook.
 ## Test
 
 ```
+dotnet test QuickLook.Plugin.XdfViewer.Tests -c Debug
+```
+
+To also check a folder of real recordings (searched recursively), point
+`XDF_CORPUS_DIR` at it. Every numeric stream must show one labelled row with a
+waveform per decoded channel, and every text stream must show its events. The
+test is skipped when the variable is unset, so CI is unaffected.
+
+```powershell
+$env:XDF_CORPUS_DIR = "D:\recordings"
 dotnet test QuickLook.Plugin.XdfViewer.Tests -c Debug
 ```
 

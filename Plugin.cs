@@ -3,6 +3,7 @@ using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
 using QuickLook.Common.Plugin;
+using QuickLook.Plugin.XdfViewer.Settings;
 using QuickLook.Plugin.XdfViewer.Xdf;
 using QuickLook.Plugin.XdfViewer.Xdf.Model;
 using QuickLook.Plugin.XdfViewer.ViewModels;
@@ -37,6 +38,15 @@ namespace QuickLook.Plugin.XdfViewer
             context.ViewerContent = panel;
             context.Title = fileName;
 
+            panel.ReloadRequested += (s, e) => Load(path, fileName, panel, context);
+            Load(path, fileName, panel, context);
+        }
+
+        private static void Load(string path, string fileName, XdfPreviewPanel panel, ContextObject context)
+        {
+            // Read the setting on the UI thread, like every other settings access, before the background hop.
+            bool regularTextAsEvents = PluginSettings.RegularTextStreamsAsEvents;
+
             Task.Run(() =>
             {
                 XdfFile file = null;
@@ -46,7 +56,7 @@ namespace QuickLook.Plugin.XdfViewer
                 // stay instant, so it only does the cheap structural parse (no sample decoding).
                 try
                 {
-                    file = XdfReader.Read(path);
+                    file = XdfReader.Read(path, regularTextAsEvents);
                     vm = file == null ? null : new XdfOverviewViewModel(file, fileName);
                     panel.Dispatcher.Invoke(() =>
                     {

@@ -16,7 +16,7 @@ namespace QuickLook.Plugin.XdfViewer.Tests
             if (withMagic) _bw.Write(new byte[] { 0x58, 0x44, 0x46, 0x3A }); // "XDF:"
         }
 
-        private void Chunk(ushort tag, byte[] content)
+        public void Chunk(ushort tag, byte[] content)
         {
             _bw.Write((byte)4);                          // NumLengthBytes
             _bw.Write((uint)(content.Length + 2));       // Length = tag(2) + content

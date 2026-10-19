@@ -6,6 +6,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased] — 1.2.1
 
+### Added
+- Text streams that declare a sample rate are now shown as events, like irregular
+  marker streams; before this they showed empty channel rows and their values were never
+  read. A new setting, **Show sampled text streams as events** (on by default), switches
+  this off. Omitted sample timestamps in such streams are filled in from the sample rate.
+- `XDF_CORPUS_DIR`: an opt-in test that checks every recording in a folder for rows,
+  labels and waveforms that don't match the data.
+
 ### Fixed
 - Streams whose header lists no channels (an empty `<desc />`, as written by the g.tec
   Unicorn LSL outlet) or only some of them now show one row per declared channel, with
