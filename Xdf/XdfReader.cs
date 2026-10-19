@@ -354,6 +354,16 @@ namespace QuickLook.Plugin.XdfViewer.Xdf
                         Type = (string)ch.Element("type")
                     });
             }
+
+            // Some outlets (e.g. g.tec Unicorn) write an empty <desc /> or a partial channel list. The
+            // samples still carry channel_count values, so pad up to it (capped like envelope building)
+            // and number any channel that has no usable label — otherwise the card shows no rows at all.
+            int declared = Math.Min(s.ChannelCount, MaxEnvelopeChannels);
+            while (s.Channels.Count < declared)
+                s.Channels.Add(new XdfChannel());
+            for (int i = 0; i < s.Channels.Count; i++)
+                if (string.IsNullOrWhiteSpace(s.Channels[i].Label))
+                    s.Channels[i].Label = "ch " + (i + 1).ToString(CultureInfo.InvariantCulture);
         }
 
         private static void ParseStreamFooter(BinaryReader reader, long contentEnd,

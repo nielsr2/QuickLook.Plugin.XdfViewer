@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 1.2.1
+
+### Fixed
+- Streams whose header lists no channels (an empty `<desc />`, as written by the g.tec
+  Unicorn LSL outlet) or only some of them now show one row per declared channel, with
+  waveforms. Before this, the channels section stayed empty. Channels without a label are
+  named `ch 1`, `ch 2`, ….
+
 ## [1.2.0] — 2026-08-12
 
 ### Added
