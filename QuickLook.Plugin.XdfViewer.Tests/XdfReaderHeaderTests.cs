@@ -25,9 +25,11 @@ namespace QuickLook.Plugin.XdfViewer.Tests
             Assert.Equal(144, s.ChannelCount);
             Assert.Equal("float32", s.ChannelFormat);
             Assert.Equal(148.148, s.NominalSampleRate, 3);
-            Assert.Equal(2, s.Channels.Count);
+            Assert.Equal(144, s.Channels.Count); // 2 declared, the rest padded up to channel_count
             Assert.Equal("ACCX1", s.Channels[0].Label);
             Assert.Equal("g", s.Channels[0].Unit);
+            Assert.Equal("ACCY1", s.Channels[1].Label);
+            Assert.Equal("ch 3", s.Channels[2].Label);
         }
 
         [Fact]

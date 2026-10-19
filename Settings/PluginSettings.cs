@@ -21,6 +21,14 @@ namespace QuickLook.Plugin.XdfViewer.Settings
             set => SettingHelper.Set("WaveformColorTheme", value.ToString(), Domain);
         }
 
+        /// <summary>Show text streams that declare a sample rate &gt; 0 as events, like irregular marker
+        /// streams. On by default; turning it off shows them as plain (waveform-less) streams.</summary>
+        public static bool RegularTextStreamsAsEvents
+        {
+            get => SettingHelper.Get("RegularTextStreamsAsEvents", true, Domain);
+            set => SettingHelper.Set("RegularTextStreamsAsEvents", value, Domain);
+        }
+
         public static Color CustomWaveformColor
         {
             get

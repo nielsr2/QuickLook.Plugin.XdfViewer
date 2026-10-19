@@ -16,7 +16,7 @@ namespace QuickLook.Plugin.XdfViewer.Tests
             if (withMagic) _bw.Write(new byte[] { 0x58, 0x44, 0x46, 0x3A }); // "XDF:"
         }
 
-        private void Chunk(ushort tag, byte[] content)
+        public void Chunk(ushort tag, byte[] content)
         {
             _bw.Write((byte)4);                          // NumLengthBytes
             _bw.Write((uint)(content.Length + 2));       // Length = tag(2) + content
@@ -143,6 +143,11 @@ namespace QuickLook.Plugin.XdfViewer.Tests
                       $"<first_timestamp>{first.ToString(ci)}</first_timestamp>" +
                       $"<last_timestamp>{last.ToString(ci)}</last_timestamp>" +
                       $"<sample_count>{count}</sample_count></info>";
+            return StreamFooterXml(id, xml);
+        }
+
+        public XdfFixtureBuilder StreamFooterXml(uint id, string xml)
+        {
             using (var m = new MemoryStream())
             using (var w = new BinaryWriter(m))
             {

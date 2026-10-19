@@ -19,6 +19,6 @@
     metadata can never drift apart.
   -->
   <PropertyGroup>
-    <PluginVersion>1.2.0</PluginVersion>
+    <PluginVersion>1.2.1</PluginVersion>
   </PropertyGroup>
 </Project>

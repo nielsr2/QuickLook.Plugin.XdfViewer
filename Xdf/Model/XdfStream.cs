@@ -19,15 +19,26 @@ namespace QuickLook.Plugin.XdfViewer.Xdf.Model
         /// <summary>Sample count summed from Samples chunks; fallback when no footer.</summary>
         public long TalliedSampleCount { get; set; }
 
+        /// <summary>True once a StreamFooter chunk was seen, even one missing some fields.</summary>
+        public bool HasFooter { get; set; }
+
         public bool IsIncomplete { get; set; }
         public bool MarkersTruncated { get; set; }
 
         public List<XdfChannel> Channels { get; } = new List<XdfChannel>();
         public List<XdfMarker> Markers { get; } = new List<XdfMarker>();
 
+        /// <summary>When true (the default), a text stream with a nominal rate &gt; 0 is shown as events
+        /// too; it has no numeric data to plot either way. Set by the reader from the user setting.</summary>
+        public bool RegularTextAsEvents { get; set; } = true;
+
+        /// <summary>Timestamp of the last decoded marker; lets the reader deduce omitted timestamps
+        /// of a regular-rate text stream (previous + 1/srate), which XDF allows writers to drop.</summary>
+        internal double LastMarkerTimestamp { get; set; } = double.NaN;
+
         public bool IsMarkerStream =>
             string.Equals(ChannelFormat, "string", System.StringComparison.OrdinalIgnoreCase) &&
-            NominalSampleRate == 0 &&
+            (NominalSampleRate == 0 || RegularTextAsEvents) &&
             !string.Equals(Type, "VideoRaw", System.StringComparison.OrdinalIgnoreCase) &&
             !string.Equals(Type, "VideoCompressed", System.StringComparison.OrdinalIgnoreCase);
 

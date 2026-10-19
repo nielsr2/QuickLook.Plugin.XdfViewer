@@ -129,7 +129,19 @@ namespace QuickLook.Plugin.XdfViewer
             _initializingSettings = true;
             WaveformThemeCombo.SelectedIndex = (int)PluginSettings.WaveformColorTheme;
             UpdateCustomColorSwatch();
+            RegularTextAsEventsCheck.IsChecked = PluginSettings.RegularTextStreamsAsEvents;
             _initializingSettings = false;
+        }
+
+        /// <summary>Raised when a setting changed that affects how the file is parsed, so the host
+        /// (Plugin.cs) re-reads it.</summary>
+        public event EventHandler ReloadRequested;
+
+        private void RegularTextAsEventsCheck_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_initializingSettings) return;
+            PluginSettings.RegularTextStreamsAsEvents = RegularTextAsEventsCheck.IsChecked == true;
+            ReloadRequested?.Invoke(this, EventArgs.Empty);
         }
 
         private void WaveformThemeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)

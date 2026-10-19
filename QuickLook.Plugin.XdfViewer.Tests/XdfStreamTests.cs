@@ -48,9 +48,20 @@ namespace QuickLook.Plugin.XdfViewer.Tests
         }
 
         [Fact]
-        public void IsMarkerStream_StringAtRegularRate_False()
+        public void IsMarkerStream_StringAtRegularRate_TrueByDefault()
         {
             var s = new XdfStream { ChannelFormat = "string", NominalSampleRate = 10000, Type = "sampledMarkers" };
+            Assert.True(s.IsMarkerStream);
+        }
+
+        [Fact]
+        public void IsMarkerStream_StringAtRegularRate_FalseWhenRegularTextAsEventsIsOff()
+        {
+            var s = new XdfStream
+            {
+                ChannelFormat = "string", NominalSampleRate = 10000, Type = "sampledMarkers",
+                RegularTextAsEvents = false
+            };
             Assert.False(s.IsMarkerStream);
         }
 

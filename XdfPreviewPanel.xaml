@@ -43,6 +43,13 @@
                    shown when the Custom theme is selected. -->
               <Button x:Name="CustomColorSwatch" Click="CustomColorSwatch_Click" Margin="0,8,0,0"
                       Height="24" HorizontalAlignment="Stretch" Visibility="Collapsed"/>
+              <TextBlock Text="STREAMS" FontSize="10" Opacity="0.6" Margin="0,14,0,6"/>
+              <!-- PluginSettings.RegularTextStreamsAsEvents; toggling re-reads the file. -->
+              <CheckBox x:Name="RegularTextAsEventsCheck" Width="160"
+                        Checked="RegularTextAsEventsCheck_Changed" Unchecked="RegularTextAsEventsCheck_Changed"
+                        ToolTip="Text streams that declare a sample rate have no numeric data to plot. When on, their values are listed as events.">
+                <TextBlock Text="Show sampled text streams as events" TextWrapping="Wrap"/>
+              </CheckBox>
             </StackPanel>
           </Border>
         </Popup>

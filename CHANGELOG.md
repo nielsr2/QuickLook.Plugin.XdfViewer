@@ -4,6 +4,27 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — 1.2.1
+
+### Added
+- Text streams that declare a sample rate are now shown as events, like irregular
+  marker streams; before this they showed empty channel rows and their values were never
+  read. A new setting, **Show sampled text streams as events** (on by default), switches
+  this off. Omitted sample timestamps in such streams are filled in from the sample rate.
+- `XDF_CORPUS_DIR`: an opt-in test that checks every recording in a folder for rows,
+  labels and waveforms that don't match the data.
+
+### Fixed
+- Streams whose header lists no channels (an empty `<desc />`, as written by the g.tec
+  Unicorn LSL outlet) or only some of them now show one row per declared channel, with
+  waveforms. Before this, the channels section stayed empty. Channels without a label are
+  named `ch 1`, `ch 2`, ….
+- A header that lists more channels than its `channel_count` no longer adds rows that
+  can never get a waveform. A header with no `channel_count` takes the count from its
+  channel list, so the stream still shows waveforms.
+- A repeated stream header for the same stream no longer shows every channel twice.
+- A stream whose footer has no `sample_count` is no longer flagged as incomplete.
+
 ## [1.2.0] — 2026-08-12
 
 ### Added
